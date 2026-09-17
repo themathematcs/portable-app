@@ -5,6 +5,7 @@
  */
 import { ensureOrbRunning } from './orbGuardian.js';
 import { getLocalOrbTelemetry } from './orbLocal.js';
+import { getOrbCloudTelemetry } from './orbCloud.js';
 
 /**
  * Reads live telemetry from the Orb sensor installed on this machine.
@@ -17,5 +18,7 @@ export async function getAllSitesTelemetry(config) {
   if (!orbStatus.isRunning) {
     throw new Error(`Orb is not running, so a live report cannot be created. ${orbStatus.error || 'Install Orb or start it on this computer.'}`);
   }
+  const cloudSites = await getOrbCloudTelemetry(config);
+  if (cloudSites) return cloudSites;
   return getLocalOrbTelemetry(config);
 }

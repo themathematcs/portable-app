@@ -71,6 +71,13 @@ npm run start-ui
 
 For a persistent Windows user variable, use `setx ORB_API_TOKEN "paste-the-key-here"`, then open a new PowerShell window before starting the app. The key is not required for local certificate telemetry.
 
+The account-level report uses Orb Cloud's documented API:
+
+- `GET /api/v2/organizations`
+- `GET /api/v2/organization/{organizationID}/devices`
+
+The API key needs **Organizations: Read** and **Devices: Read** permissions. With a key configured, the app uses Cloud devices; without one, it uses the local certificate summary for the current machine.
+
 ## Important notes
 
 - The real Orb certificate and local auth files are not meant to be committed to a public repository.
