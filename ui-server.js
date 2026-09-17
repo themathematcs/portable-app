@@ -89,41 +89,63 @@ async function saveConfig(request, res) {
   }
 }
 
-function runCommand(command, args) {
+function runCommand(command, args, label = 'command') {
   return new Promise((resolve, reject) => {
+    console.log(`[UI Action] Starting ${label}: ${command} ${args.join(' ')}`);
+
     const child = spawn(command, args, {
       cwd: rootDir,
-      shell: true,
-      windowsHide: true
+      shell: false,
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe']
     });
 
     let stdout = '';
     let stderr = '';
 
-    child.stdout.on('data', chunk => { stdout += chunk.toString(); });
-    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
-
-    child.on('close', code => {
-      if (code === 0) {
-        resolve({ ok: true, stdout, stderr });
-      } else {
-        reject(new Error(stderr || stdout || `Command failed with exit code ${code}`));
+    child.stdout.on('data', chunk => {
+      const text = chunk.toString();
+      stdout += text;
+      if (text.trim()) {
+        process.stdout.write(text);
       }
     });
 
-    child.on('error', reject);
+    child.stderr.on('data', chunk => {
+      const text = chunk.toString();
+      stderr += text;
+      if (text.trim()) {
+        process.stderr.write(text);
+      }
+    });
+
+    child.on('close', code => {
+      if (code === 0) {
+        console.log(`[UI Action] Completed ${label} successfully.`);
+        resolve({ ok: true, stdout, stderr });
+      } else {
+        const message = stderr || stdout || `Command failed with exit code ${code}`;
+        console.error(`[UI Action] Failed ${label}: ${message.trim()}`);
+        reject(new Error(message.trim()));
+      }
+    });
+
+    child.on('error', (error) => {
+      console.error(`[UI Action] Spawn error for ${label}: ${error.message}`);
+      reject(error);
+    });
   });
 }
 
 async function handleAction(action) {
   switch (action) {
     case 'dry-run':
-      return runCommand('node', ['agent.js', '--test-whatsapp']);
+      return runCommand('node', ['agent.js', '--test-whatsapp'], 'WhatsApp connectivity test');
     case 'daily':
     case 'send-report':
-      return runCommand('node', ['agent.js', '--daily']);
+      return runCommand('node', ['agent.js', '--daily'], 'full Orb report');
     case 'test-whatsapp':
-      return runCommand('node', ['agent.js', '--test-whatsapp']);
+      return runCommand('node', ['agent.js', '--test-whatsapp'], 'WhatsApp connectivity test');
     case 'pair-whatsapp':
     case 'pair-whatsapp-ui':
       return { ok: true, message: 'Pairing started in the UI.' };
