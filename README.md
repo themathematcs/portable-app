@@ -60,7 +60,16 @@ The app checks the local Orb installation and reads the site name, ISP, and syst
 
 ## Optional Orb API key
 
-An Orb API key can be entered in the local setup UI or supplied on the target computer as `ORB_API_TOKEN`. The key is not required for local certificate telemetry. Do not paste it into chat, commit it to Git, or place it in a public repository. The local `config.json` file is ignored by Git.
+For account-level Orb access, set the key as an environment variable on the target computer. Do not enter it in the UI, paste it into chat, commit it to Git, or place it in a public repository.
+
+For the current PowerShell session:
+
+```powershell
+$env:ORB_API_TOKEN = 'paste-the-key-here'
+npm run start-ui
+```
+
+For a persistent Windows user variable, use `setx ORB_API_TOKEN "paste-the-key-here"`, then open a new PowerShell window before starting the app. The key is not required for local certificate telemetry.
 
 ## Important notes
 

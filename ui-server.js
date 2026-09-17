@@ -83,6 +83,8 @@ async function saveConfig(request, res) {
       schedule: { ...existing.schedule, ...payload.schedule }
     };
 
+    if (merged.orb) delete merged.orb.apiToken;
+
     fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf8');
     sendJson(res, 200, { ok: true, message: 'Settings saved.' });
   } catch (error) {
