@@ -4,7 +4,18 @@ import { promisify } from 'node:util';
 const execAsync = promisify(exec);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const ORB_APP_SHELL_ID = 'shell:AppsFolder\\Orb_rwe8ryttnqs9e!ORB';
+const ORB_APP_SHELL_IDS = [
+  'shell:AppsFolder\\Orb_rwe8ryttnqs9e!ORB',
+  'Orb',
+  'Orb.exe'
+];
+
+const ORB_EXECUTABLE_CANDIDATES = [
+  'C:/Program Files/Orb/Orb.exe',
+  'C:/Program Files (x86)/Orb/Orb.exe',
+  'C:/Program Files/Orb App/Orb.exe',
+  'C:/Program Files (x86)/Orb App/Orb.exe'
+];
 
 /**
  * Checks if the Orb process is currently running on the system.
@@ -66,8 +77,18 @@ export async function ensureOrbRunning({ autoLaunch = true, maxWaitMs = 8000 } =
   console.log(`[Orb Guardian] ⚠️ Orb process is NOT running. Initiating auto-launch...`);
 
   try {
-    const launchCmd = `powershell -NoProfile -Command "Start-Process '${ORB_APP_SHELL_ID}'"`;
-    await execAsync(launchCmd);
+    const launchCmd = `powershell -NoProfile -Command "${[
+      "$orbAppIds = @('shell:AppsFolder\\Orb_rwe8ryttnqs9e!ORB','Orb','Orb.exe');",
+      "$orbPaths = @('C:/Program Files/Orb/Orb.exe','C:/Program Files (x86)/Orb/Orb.exe','C:/Program Files/Orb App/Orb.exe','C:/Program Files (x86)/Orb App/Orb.exe');",
+      "foreach ($id in $orbAppIds) { try { Start-Process $id -ErrorAction Stop; Write-Output \"LAUNCHED:$id\"; return } catch {} }",
+      "foreach ($p in $orbPaths) { if (Test-Path $p) { try { Start-Process $p -ErrorAction Stop; Write-Output \"LAUNCHED:$p\"; return } catch {} } }",
+      "Write-Output 'NO_LAUNCH_CANDIDATE'"
+    ].join(' ')}"`;
+
+    const { stdout } = await execAsync(launchCmd);
+    if (stdout && stdout.includes('NO_LAUNCH_CANDIDATE')) {
+      throw new Error('Orb installation path or app identifier could not be found on this machine.');
+    }
   } catch (launchErr) {
     console.error(`[Orb Guardian] Failed to launch Orb: ${launchErr.message}`);
     return {
