@@ -114,11 +114,11 @@ export async function discoverOrbExecutable() {
 /**
  * Checks if the Orb process is currently running on the system.
  * 
- * @returns {Promise<{isRunning: boolean, pid: number|null, memoryMb: number|null}>}
+ * @returns {Promise<{isRunning: boolean, pid: number|null, memoryMb: number|null, hasVisibleWindow: boolean}>}
  */
 export async function checkOrbStatus() {
   try {
-    const cmd = `powershell -NoProfile -Command "Get-Process -Name Orb -ErrorAction SilentlyContinue | Select-Object -First 1 Id, WorkingSet64 | ConvertTo-Json"`;
+    const cmd = `powershell -NoProfile -Command "Get-Process -Name Orb -ErrorAction SilentlyContinue | Select-Object -First 1 Id, WorkingSet64, MainWindowHandle, MainWindowTitle | ConvertTo-Json"`;
     const { stdout } = await execAsync(cmd);
     if (stdout && stdout.trim().startsWith('{')) {
       const parsed = JSON.parse(stdout);
@@ -126,7 +126,8 @@ export async function checkOrbStatus() {
       return {
         isRunning: true,
         pid: parsed.Id,
-        memoryMb: memMb
+        memoryMb: memMb,
+        hasVisibleWindow: Number(parsed.MainWindowHandle || 0) !== 0
       };
     }
   } catch (_) {}
@@ -134,7 +135,8 @@ export async function checkOrbStatus() {
   return {
     isRunning: false,
     pid: null,
-    memoryMb: null
+    memoryMb: null,
+    hasVisibleWindow: false
   };
 }
 
@@ -154,6 +156,7 @@ export async function ensureOrbRunning({ autoLaunch = true, maxWaitMs = 8000 } =
       isRunning: true,
       pid: status.pid,
       memoryMb: status.memoryMb,
+      hasVisibleWindow: status.hasVisibleWindow,
       autoStarted: false,
       error: null
     };
@@ -219,6 +222,7 @@ export async function ensureOrbRunning({ autoLaunch = true, maxWaitMs = 8000 } =
         isRunning: true,
         pid: status.pid,
         memoryMb: status.memoryMb,
+        hasVisibleWindow: status.hasVisibleWindow,
         autoStarted: true,
         error: null
       };

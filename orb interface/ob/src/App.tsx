@@ -47,42 +47,7 @@ function buildLiveOnlyClient(liveData: OrbLiveData): ClientMonitor {
 function applyLiveData(clients: ClientMonitor[]): ClientMonitor[] {
   const liveData: OrbLiveData | undefined = window.__ORB_DATA__;
   if (!liveData) return clients;
-
-  const targetId = (liveData.cloneId || liveData.id || '').toLowerCase();
-  const targetIndex = clients.findIndex((client) =>
-    client.id.toLowerCase() === targetId || client.name.toLowerCase() === String(liveData.name || '').toLowerCase()
-  );
-
-  if (targetIndex >= 0) {
-    const target = clients[targetIndex];
-    const latency = typeof liveData.latencyMs === 'number'
-      ? liveData.latencyMs
-      : Number.parseFloat(String(liveData.latencyMs || '0')) || target.telemetry?.lagInternetMs || 0;
-    const updated: ClientMonitor = {
-      ...target,
-      id: liveData.cloneId || liveData.id || target.id,
-      name: liveData.name || target.name,
-      score: liveData.score ?? target.score,
-      status: liveData.status ?? target.status,
-      connectionName: liveData.connection ?? target.connectionName,
-      ispName: liveData.isp ?? target.ispName,
-      uptimeText: liveData.uptime ?? target.uptimeText,
-      responsivenessScore: liveData.components?.responsiveness ?? target.responsivenessScore,
-      reliabilityScore: liveData.components?.reliability ?? target.reliabilityScore,
-      speedScore: liveData.components?.bandwidth ?? target.speedScore,
-      telemetry: {
-        ...target.telemetry,
-        lagInternetMs: latency,
-        downloadMbps: liveData.downloadMbps ?? target.telemetry?.downloadMbps ?? 0,
-        uploadMbps: liveData.uploadMbps ?? target.telemetry?.uploadMbps ?? 0,
-        networkEndpoint: liveData.location ?? target.telemetry?.networkEndpoint ?? 'Unknown',
-      },
-    };
-
-    return clients.map((client, index) => (index === targetIndex ? updated : client));
-  }
-
-  return [buildLiveOnlyClient(liveData), ...clients.filter((client) => client.id !== 'blackbird')];
+  return [buildLiveOnlyClient(liveData)];
 }
 
 export default function App() {

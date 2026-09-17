@@ -5,7 +5,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getLocalOrbTelemetry } from './src/orbLocal.js';
-import { discoverOrbExecutable } from './src/orbGuardian.js';
+import { discoverOrbExecutable, ensureOrbRunning } from './src/orbGuardian.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +77,7 @@ async function saveConfig(request, res) {
       statusNotes: { ...existing.statusNotes, ...payload.statusNotes },
       telegram: { ...existing.telegram, ...payload.telegram },
       whatsapp: { ...existing.whatsapp, ...payload.whatsapp },
+      orb: { ...existing.orb, ...payload.orb },
       agent: { ...existing.agent, ...payload.agent },
       alerts: { ...existing.alerts, ...payload.alerts },
       schedule: { ...existing.schedule, ...payload.schedule }
@@ -272,18 +273,34 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/orb-status') {
     (async () => {
       try {
+        const config = readJsonFile(configPath) || readJsonFile(exampleConfigPath) || {};
+        const orbRuntime = await ensureOrbRunning({ autoLaunch: true, maxWaitMs: 15000 });
+        if (!orbRuntime.isRunning) {
+          throw new Error(`Orb could not be started. ${orbRuntime.error || 'Install Orb or start it on this computer.'}`);
+        }
         const discovery = await discoverOrbExecutable();
-        const sites = await getLocalOrbTelemetry();
+        const sites = await getLocalOrbTelemetry(config);
         const first = Array.isArray(sites) ? sites[0] : null;
+        const { findOrbCertificateConfig } = await import('./src/orbLocal.js');
+        const auth = findOrbCertificateConfig(config.orb || {});
         sendJson(res, 200, {
           ok: true,
           siteName: first?.name || '',
           isp: first?.isp || '',
           status: first?.status || 'UNKNOWN',
           data: first || null,
+          processId: orbRuntime.pid || null,
+          hasVisibleWindow: orbRuntime.hasVisibleWindow || false,
+          autoStarted: orbRuntime.autoStarted || false,
           executablePath: discovery.executablePath || null,
           searchedPaths: discovery.searchedPaths || [],
-          message: `Orb detected at ${discovery.executablePath || 'unknown location'} and summary data loaded successfully.`
+          certificateDirectory: auth?.dir || null,
+          certificatePath: auth?.certificatePath || null,
+          privateKeyPath: auth?.keyPath || null,
+          certificateSource: auth?.source || null,
+          message: orbRuntime.hasVisibleWindow
+            ? `Orb is running with a visible desktop window at ${discovery.executablePath || 'unknown location'} and live summary data is loaded.`
+            : `Orb is running in the background (PID ${orbRuntime.pid || 'unknown'}); it has no visible desktop window. Live summary data is loaded.`
         });
       } catch (error) {
         const discovery = await discoverOrbExecutable().catch(() => ({
@@ -296,9 +313,15 @@ const server = http.createServer((req, res) => {
           siteName: '',
           isp: '',
           status: 'FAILED',
+          processId: null,
+          hasVisibleWindow: false,
+          autoStarted: false,
           message: error.message || 'Orb status unavailable.',
           executablePath: discovery.executablePath || null,
           searchedPaths: discovery.searchedPaths || [],
+          certificateDirectory: null,
+          certificatePath: null,
+          privateKeyPath: null,
           failureReason: discovery.error || error.message || 'Orb status unavailable.'
         });
       }

@@ -220,6 +220,27 @@
       </div>
 
       <div class="card">
+        <h2>Orb certificate</h2>
+        <div class="field">
+          <label for="orbConfigDir">Orb config folder</label>
+          <input id="orbConfigDir" type="text" placeholder="C:\\Users\\your-name\\.config\\orb" />
+        </div>
+        <div class="field">
+          <label for="orbCertificatePath">Certificate path</label>
+          <input id="orbCertificatePath" type="text" placeholder="Leave blank to use config folder\\certificate.crt" />
+        </div>
+        <div class="field">
+          <label for="orbPrivateKeyPath">Private key path</label>
+          <input id="orbPrivateKeyPath" type="text" placeholder="Leave blank to use config folder\\private.key" />
+        </div>
+        <div class="button-row">
+          <button id="autoOrbPathsBtn" class="secondary" type="button">Use automatic detection</button>
+        </div>
+        <div class="tiny">Usually you can leave these blank. The app searches the current Windows user's Orb folder automatically, then uses certificate.crt and private.key there. Manual paths are only needed for a custom installation.</div>
+        <div id="orbCertificateStatus" class="setting-status"></div>
+      </div>
+
+      <div class="card">
         <h2>Report schedule</h2>
         <div class="row">
           <div class="field">
@@ -306,6 +327,7 @@
   <script>
     const statusBox = document.getElementById('statusBox');
     const orbDetectionStatus = document.getElementById('orbDetectionStatus');
+    const orbCertificateStatus = document.getElementById('orbCertificateStatus');
     const pairPanel = document.getElementById('pairPanel');
     const pairStatusText = document.getElementById('pairStatusText');
     const pairQrWrap = document.getElementById('pairQrWrap');
@@ -326,11 +348,19 @@
       }
 
       const msg = state.ok
-        ? `Orb detected and reachable${state.executablePath ? ` at ${state.executablePath}` : ''}.`
+        ? (state.hasVisibleWindow
+          ? `Orb is running with a visible desktop window${state.executablePath ? ` at ${state.executablePath}` : ''}. Live data is available.`
+          : `Orb is running in the background (PID ${state.processId || 'unknown'}); no desktop window is open. Live data is available.`)
         : `Orb not detected. ${state.failureReason || state.message || 'Check the installation path.'}${state.searchedPaths?.length ? ` Searched: ${state.searchedPaths.slice(0, 8).join(' | ')}` : ''}`;
 
       orbDetectionStatus.className = `setting-status visible ${state.ok ? 'ok' : 'error'}`;
       orbDetectionStatus.textContent = msg;
+
+      const authMsg = state.certificatePath && state.privateKeyPath
+        ? `Using ${state.certificateSource || 'configured'} certificate files: ${state.certificatePath} and ${state.privateKeyPath}`
+        : 'Certificate files were not resolved yet.';
+      orbCertificateStatus.className = `setting-status visible ${state.certificatePath && state.privateKeyPath ? 'ok' : 'error'}`;
+      orbCertificateStatus.textContent = authMsg;
     }
 
     function renderPairingState(state) {
@@ -379,6 +409,9 @@
 
         siteNameEl.value = config.site?.name || '';
         siteIspEl.value = config.site?.isp || '';
+        document.getElementById('orbConfigDir').value = config.orb?.configDir || '';
+        document.getElementById('orbCertificatePath').value = config.orb?.certificatePath || '';
+        document.getElementById('orbPrivateKeyPath').value = config.orb?.privateKeyPath || '';
         document.getElementById('summary').value = config.statusNotes?.summary || '';
         document.getElementById('reportHour').value = config.schedule?.dailyReportHour ?? 8;
         document.getElementById('reportMinute').value = config.schedule?.dailyReportMinute ?? 0;
@@ -431,6 +464,11 @@
             enabled: document.getElementById('telegramEnabled').checked,
             botToken: document.getElementById('telegramBotToken').value.trim(),
             chatId: document.getElementById('telegramChatId').value.trim()
+          },
+          orb: {
+            configDir: document.getElementById('orbConfigDir').value.trim(),
+            certificatePath: document.getElementById('orbCertificatePath').value.trim(),
+            privateKeyPath: document.getElementById('orbPrivateKeyPath').value.trim()
           }
         };
 
@@ -438,6 +476,22 @@
         setStatus('Settings saved successfully.', 'success');
       } catch (error) {
         setStatus('Save failed: ' + error.message, 'error');
+      }
+    });
+
+    document.getElementById('autoOrbPathsBtn').addEventListener('click', async () => {
+      document.getElementById('orbConfigDir').value = '';
+      document.getElementById('orbCertificatePath').value = '';
+      document.getElementById('orbPrivateKeyPath').value = '';
+      try {
+        await api('/api/config', 'POST', {
+          orb: { configDir: '', certificatePath: '', privateKeyPath: '' }
+        });
+        setStatus('Automatic Orb certificate detection enabled.', 'success');
+        const orbInfo = await api('/api/orb-status');
+        renderOrbDetectionState(orbInfo);
+      } catch (error) {
+        setStatus('Could not enable automatic detection: ' + error.message, 'error');
       }
     });
 

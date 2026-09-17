@@ -15,12 +15,40 @@ function candidateConfigDirs() {
   return [...new Set(dirs)];
 }
 
-export function findOrbCertificateConfig() {
+function resolveConfiguredPath(value) {
+  if (!value) return null;
+  const expanded = value
+    .replace(/^~(?=$|[\\/])/, process.env.USERPROFILE || process.env.HOME || '~')
+    .replace(/%USERPROFILE%/gi, process.env.USERPROFILE || '%USERPROFILE%')
+    .replace(/%HOME%/gi, process.env.HOME || '%HOME%')
+    .replace(/\$HOME/gi, process.env.HOME || '$HOME');
+  return path.resolve(expanded);
+}
+
+export function findOrbCertificateConfig(orbConfig = {}) {
+  const configuredDir = resolveConfiguredPath(orbConfig.configDir);
+  const configuredCertificatePath = orbConfig.certificatePath
+    ? resolveConfiguredPath(orbConfig.certificatePath)
+    : configuredDir ? path.join(configuredDir, 'certificate.crt') : null;
+  const configuredKeyPath = orbConfig.privateKeyPath
+    ? resolveConfiguredPath(orbConfig.privateKeyPath)
+    : configuredDir ? path.join(configuredDir, 'private.key') : null;
+
+  if (configuredCertificatePath && configuredKeyPath
+    && fs.existsSync(configuredCertificatePath) && fs.existsSync(configuredKeyPath)) {
+    return {
+      dir: path.dirname(configuredCertificatePath),
+      certificatePath: configuredCertificatePath,
+      keyPath: configuredKeyPath,
+      source: 'configured'
+    };
+  }
+
   for (const dir of candidateConfigDirs()) {
     const certificatePath = path.join(dir, 'certificate.crt');
     const keyPath = path.join(dir, 'private.key');
     if (fs.existsSync(certificatePath) && fs.existsSync(keyPath)) {
-      return { dir, certificatePath, keyPath };
+      return { dir, certificatePath, keyPath, source: 'automatic' };
     }
   }
   return null;
@@ -103,10 +131,10 @@ export function normalizeOrbSummary(summary) {
   };
 }
 
-export async function getLocalOrbTelemetry() {
-  const auth = findOrbCertificateConfig();
+export async function getLocalOrbTelemetry(config = {}) {
+  const auth = findOrbCertificateConfig(config.orb || config);
   if (!auth) {
-    throw new Error('Orb certificate not found. Expected %USERPROFILE%\\.config\\orb\\certificate.crt and private.key, or set ORB_CONFIG_DIR.');
+    throw new Error('Orb certificate not found. Set an Orb config folder containing certificate.crt and private.key, or leave the fields blank for automatic detection.');
   }
   const summary = await fetchLocalSummary(auth);
   const site = normalizeOrbSummary(summary);

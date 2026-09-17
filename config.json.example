@@ -26,6 +26,11 @@
     "connectionTimeoutMs": 45000,
     "maxRetries": 3
   },
+  "orb": {
+    "configDir": "",
+    "certificatePath": "",
+    "privateKeyPath": ""
+  },
   "agent": {
     "reportScheduleCron": "0 8 * * *",
     "tempImagePath": "./report_img.png",

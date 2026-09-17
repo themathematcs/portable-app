@@ -220,7 +220,7 @@ export async function screenshotSiteDetailView(cloneId, outPath, siteData = null
     await page.evaluateOnNewDocument((data) => {
       window.__ORB_DATA__ = data;
     }, siteData ? { ...siteData, cloneId } : null);
-    await page.goto(url, { waitUntil: 'networkidle0', timeout: 20_000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20_000 });
     try {
       await page.waitForSelector('#client-detail-view', { timeout: 5000 });
     } catch {
@@ -237,8 +237,7 @@ export async function screenshotSiteDetailView(cloneId, outPath, siteData = null
 
 export async function getCloneScreenshot(cloneId, siteName, siteData = null, runtime = null) {
   if (!cloneId) {
-    console.warn(`[Clone] No clone ID for site "${siteName}" - will use fallback card.`);
-    return null;
+    throw new Error(`[Clone] No real Orb interface mapping exists for site "${siteName}".`);
   }
 
   const activeRuntime = runtime || await ensureCloneServerRunning();
@@ -248,6 +247,6 @@ export async function getCloneScreenshot(cloneId, siteName, siteData = null, run
     return await screenshotSiteDetailView(cloneId, outPath, siteData, activeRuntime);
   } catch (err) {
     console.error(`[Clone] Screenshot failed for "${siteName}": ${err.message}`);
-    return null;
+    throw err;
   }
 }

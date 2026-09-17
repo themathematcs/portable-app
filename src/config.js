@@ -72,7 +72,10 @@ export function loadConfig(configPath) {
     },
     orb: {
       apiToken: process.env.ORB_API_TOKEN || rawConfig.orb?.apiToken || '',
-      apiUrl: rawConfig.orb?.apiUrl || 'https://panel.orb.net'
+      apiUrl: rawConfig.orb?.apiUrl || 'https://panel.orb.net',
+      configDir: process.env.ORB_CONFIG_DIR || rawConfig.orb?.configDir || '',
+      certificatePath: process.env.ORB_CERTIFICATE_PATH || rawConfig.orb?.certificatePath || '',
+      privateKeyPath: process.env.ORB_PRIVATE_KEY_PATH || rawConfig.orb?.privateKeyPath || ''
     },
     alerts: rawConfig.alerts || {
       enabled: true,

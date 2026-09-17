@@ -13,6 +13,9 @@ import { getLocalOrbTelemetry } from './orbLocal.js';
  * @returns {Promise<Array<object>>} List of real, non-synthetic site objects
  */
 export async function getAllSitesTelemetry(config) {
-  await ensureOrbRunning({ autoLaunch: true, maxWaitMs: 15000 });
-  return getLocalOrbTelemetry();
+  const orbStatus = await ensureOrbRunning({ autoLaunch: true, maxWaitMs: 15000 });
+  if (!orbStatus.isRunning) {
+    throw new Error(`Orb is not running, so a live report cannot be created. ${orbStatus.error || 'Install Orb or start it on this computer.'}`);
+  }
+  return getLocalOrbTelemetry(config);
 }
