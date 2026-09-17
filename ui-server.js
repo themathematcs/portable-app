@@ -117,9 +117,11 @@ function runCommand(command, args) {
 async function handleAction(action) {
   switch (action) {
     case 'dry-run':
-      return runCommand('node', ['agent.js', '--daily', '--dry-run']);
+      return runCommand('node', ['agent.js', '--test-whatsapp']);
     case 'daily':
       return runCommand('node', ['agent.js', '--daily']);
+    case 'test-whatsapp':
+      return runCommand('node', ['agent.js', '--test-whatsapp']);
     case 'pair-whatsapp':
     case 'pair-whatsapp-ui':
       return { ok: true, message: 'Pairing started in the UI.' };

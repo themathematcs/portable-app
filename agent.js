@@ -37,6 +37,7 @@ function parseArgs() {
     daemon: false,
     testAlert: false,
     dryRun: false,
+    testWhatsapp: false,
     authWa: false,
     testCapture: false,
     listGroups: false,
@@ -61,6 +62,8 @@ function parseArgs() {
       options.testAlert = true;
     } else if (arg === '--dry-run') {
       options.dryRun = true;
+    } else if (arg === '--test-whatsapp' || arg === '--test-wa') {
+      options.testWhatsapp = true;
     } else if (arg === '--auth-wa') {
       options.authWa = true;
     } else if (arg === '--phone' && args[i + 1]) {
@@ -105,6 +108,7 @@ Multi-Site & Watchdog Modes:
 Single Site & Legacy Modes:
   --once               Execute single site / daily report cycle once and exit
   --dry-run            Simulate execution (renders images and formats reports without sending)
+  --test-whatsapp      Send a real WhatsApp test message to the configured recipient
   --to <recipient>     Direct report to a specific phone number or WhatsApp group JID
 
 WhatsApp Setup:
@@ -297,6 +301,29 @@ async function main() {
     await evaluateAlerts(config, [targetSite], { forceDispatch: true, dryRun: options.dryRun });
     console.log(`[Test] Instant alert test completed.`);
     process.exit(0);
+  }
+
+  // Mode: real WhatsApp test message
+  if (options.testWhatsapp) {
+    try {
+      const reportText = `🧪 WhatsApp connectivity test\n\nThis is a live test message from the Orb reporting app.\nIf you received this, WhatsApp delivery is working correctly.`;
+      if (!config.whatsapp?.enabled || !config.whatsapp?.recipientJid) {
+        throw new Error('WhatsApp is not enabled or the recipient is missing in config.json.');
+      }
+      await sendWhatsAppReport({
+        recipientJid: config.whatsapp.recipientJid,
+        imagePath: null,
+        caption: reportText,
+        authFolder: config.whatsapp.authFolder,
+        connectionTimeoutMs: config.whatsapp.connectionTimeoutMs,
+        maxRetries: config.whatsapp.maxRetries
+      });
+      console.log('[WhatsApp Test] Live test message sent successfully.');
+      process.exit(0);
+    } catch (err) {
+      console.error(`[WhatsApp Test Error] ${err.message}`);
+      process.exit(1);
+    }
   }
 
   // Mode: Daily discovered-site report cycle

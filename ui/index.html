@@ -402,11 +402,11 @@
 
     document.getElementById('dryRunBtn').addEventListener('click', async () => {
       try {
-        setStatus('Running dry-run test...', 'success');
-        const result = await api('/api/run', 'POST', { action: 'dry-run' });
-        setStatus(result.stdout || 'Dry-run completed successfully.', 'success');
+        setStatus('Sending live WhatsApp test message...', 'success');
+        const result = await api('/api/run', 'POST', { action: 'test-whatsapp' });
+        setStatus(result.stdout || 'Live WhatsApp test message sent successfully.', 'success');
       } catch (error) {
-        setStatus('Dry-run failed: ' + error.message, 'error');
+        setStatus('WhatsApp test failed: ' + error.message, 'error');
       }
     });
 
