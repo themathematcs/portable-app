@@ -1,0 +1,11 @@
+﻿node_modules/
+config.json
+config.json.example
+auth_info/
+*.key
+*.pem
+*.crt
+*.log
+.env
+.env.*
+.DS_Store

@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orb Report Setup</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --ink: #1f2a37;
+      --muted: #5f6f85;
+      --line: #dfe7f1;
+      --primary: #0f7ae5;
+      --primary-dark: #0b5db1;
+      --success: #0d8a4d;
+      --danger: #c5392d;
+      --shadow: 0 12px 30px rgba(14, 39, 80, 0.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    .wrap {
+      max-width: 980px;
+      margin: 32px auto;
+      padding: 0 20px 50px;
+    }
+    .header {
+      background: linear-gradient(135deg, #0f7ae5, #0a5bbd);
+      color: white;
+      border-radius: 18px;
+      padding: 26px 28px;
+      box-shadow: var(--shadow);
+      margin-bottom: 24px;
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 2vw, 2.6rem); }
+    .header p { margin: 0; opacity: 0.92; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 20px;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 1.2rem;
+    }
+    .field { margin-bottom: 12px; }
+    label {
+      display: block;
+      font-size: 0.87rem;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 0.96rem;
+      background: white;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 8px;
+      font-weight: 600;
+    }
+    .toggle input {
+      width: 18px;
+      height: 18px;
+    }
+    button {
+      border: none;
+      background: var(--primary);
+      color: white;
+      padding: 12px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.98rem;
+      font-weight: 700;
+      transition: 0.2s ease;
+    }
+    button:hover { background: var(--primary-dark); }
+    .secondary {
+      background: #edf4ff;
+      color: var(--primary-dark);
+    }
+    .secondary:hover { background: #dfeeff; }
+    .danger {
+      background: var(--danger);
+    }
+    .danger:hover { background: #a82a22; }
+    .button-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .status {
+      margin-top: 18px;
+      background: #f3f8ff;
+      border: 1px solid #d9e9ff;
+      color: #214a7b;
+      border-radius: 10px;
+      padding: 12px 14px;
+      min-height: 48px;
+      display: none;
+    }
+    .status.error {
+      background: #fff1f1;
+      border-color: #ffd6d2;
+      color: #8a2d25;
+    }
+    .status.success {
+      background: #eefcf4;
+      border-color: #cfeedd;
+      color: #1d6f43;
+    }
+    .status.visible { display: block; }
+    .tiny {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+    .pair-panel {
+      margin-top: 18px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f9fbff;
+      padding: 16px;
+      display: none;
+    }
+    .pair-panel.visible { display: block; }
+    .pair-panel img {
+      max-width: 280px;
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: white;
+      margin-top: 12px;
+    }
+    .pair-code {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 0.35rem;
+      text-align: center;
+      margin: 16px 0;
+      color: var(--primary-dark);
+      background: white;
+      border: 1px dashed var(--primary);
+      border-radius: 10px;
+      padding: 14px 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Orb Report Setup</h1>
+      <p>Fill in the fields below and save. This writes the app configuration automatically.</p>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Site info</h2>
+        <div class="field">
+          <label for="siteName">Site name</label>
+          <input id="siteName" type="text" />
+        </div>
+        <div class="field">
+          <label for="siteIsp">ISP</label>
+          <input id="siteIsp" type="text" />
+        </div>
+        <div class="field">
+          <label for="summary">Status summary</label>
+          <input id="summary" type="text" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Report schedule</h2>
+        <div class="row">
+          <div class="field">
+            <label for="reportHour">Hour</label>
+            <input id="reportHour" type="number" min="0" max="23" />
+          </div>
+          <div class="field">
+            <label for="reportMinute">Minute</label>
+            <input id="reportMinute" type="number" min="0" max="59" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="checkInterval">Alert check interval (minutes)</label>
+          <input id="checkInterval" type="number" min="1" />
+        </div>
+        <div class="field">
+          <label for="degradedThreshold">Degraded threshold</label>
+          <input id="degradedThreshold" type="number" min="0" max="100" />
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>WhatsApp</h2>
+        <div class="field">
+          <label for="whatsappRecipient">Recipient number or group JID</label>
+          <input id="whatsappRecipient" type="text" placeholder="254712345678 or group@..." />
+        </div>
+        <div class="field">
+          <label for="pairMethod">Pairing method</label>
+          <select id="pairMethod">
+            <option value="qr">QR code</option>
+            <option value="code">8-character code</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="pairPhone">Phone number for code pairing</label>
+          <input id="pairPhone" type="text" placeholder="254712345678" />
+        </div>
+        <div class="toggle">
+          <input id="whatsappEnabled" type="checkbox" />
+          <label for="whatsappEnabled">Enable WhatsApp delivery</label>
+        </div>
+        <div class="tiny">The pairing flow stays inside this page instead of opening a separate tab.</div>
+      </div>
+
+      <div class="card">
+        <h2>Telegram</h2>
+        <div class="field">
+          <label for="telegramBotToken">Bot token</label>
+          <input id="telegramBotToken" type="text" />
+        </div>
+        <div class="field">
+          <label for="telegramChatId">Chat ID</label>
+          <input id="telegramChatId" type="text" />
+        </div>
+        <div class="toggle">
+          <input id="telegramEnabled" type="checkbox" />
+          <label for="telegramEnabled">Enable Telegram delivery</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 20px;">
+      <h2>Actions</h2>
+      <div class="button-row">
+        <button id="saveBtn">Save settings</button>
+        <button id="dryRunBtn" class="secondary">Run dry test</button>
+        <button id="pairWaBtn" class="secondary">Pair WhatsApp</button>
+      </div>
+      <div id="pairPanel" class="pair-panel">
+        <strong id="pairStatusText">Ready to pair.</strong>
+        <div id="pairQrWrap" style="display:none;">
+          <img id="pairQrImg" alt="WhatsApp QR code" />
+        </div>
+        <div id="pairCodeWrap" style="display:none;">
+          <div id="pairCodeValue" class="pair-code"></div>
+        </div>
+      </div>
+      <div id="statusBox" class="status"></div>
+    </div>
+  </div>
+
+  <script>
+    const statusBox = document.getElementById('statusBox');
+    const pairPanel = document.getElementById('pairPanel');
+    const pairStatusText = document.getElementById('pairStatusText');
+    const pairQrWrap = document.getElementById('pairQrWrap');
+    const pairCodeWrap = document.getElementById('pairCodeWrap');
+    const pairQrImg = document.getElementById('pairQrImg');
+    const pairCodeValue = document.getElementById('pairCodeValue');
+
+    function setStatus(message, type = 'success') {
+      statusBox.textContent = message;
+      statusBox.className = `status visible ${type}`;
+    }
+
+    function renderPairingState(state) {
+      if (!state || state.status === 'idle') {
+        pairPanel.classList.remove('visible');
+        return;
+      }
+
+      pairPanel.classList.add('visible');
+      pairStatusText.textContent = state.message || 'Pairing in progress...';
+
+      if (state.qrDataUrl) {
+        pairQrWrap.style.display = 'block';
+        pairQrImg.src = state.qrDataUrl;
+      } else {
+        pairQrWrap.style.display = 'none';
+      }
+
+      if (state.code) {
+        pairCodeWrap.style.display = 'block';
+        pairCodeValue.textContent = state.code;
+      } else {
+        pairCodeWrap.style.display = 'none';
+      }
+    }
+
+    async function api(path, method = 'GET', body) {
+      const options = {
+        method,
+        headers: { 'Content-Type': 'application/json' }
+      };
+      if (body) options.body = JSON.stringify(body);
+      const res = await fetch(path, options);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || 'Request failed');
+      }
+      return data;
+    }
+
+    async function loadConfig() {
+      try {
+        const config = await api('/api/config');
+        const siteNameEl = document.getElementById('siteName');
+        const siteIspEl = document.getElementById('siteIsp');
+
+        siteNameEl.value = config.site?.name || '';
+        siteIspEl.value = config.site?.isp || '';
+        document.getElementById('summary').value = config.statusNotes?.summary || '';
+        document.getElementById('reportHour').value = config.schedule?.dailyReportHour ?? 8;
+        document.getElementById('reportMinute').value = config.schedule?.dailyReportMinute ?? 0;
+        document.getElementById('checkInterval').value = config.alerts?.checkIntervalMinutes ?? 3;
+        document.getElementById('degradedThreshold').value = config.alerts?.degradedThreshold ?? 75;
+        document.getElementById('whatsappRecipient').value = config.whatsapp?.recipientJid || '';
+        document.getElementById('whatsappEnabled').checked = !!config.whatsapp?.enabled;
+        document.getElementById('telegramBotToken').value = config.telegram?.botToken || '';
+        document.getElementById('telegramChatId').value = config.telegram?.chatId || '';
+        document.getElementById('telegramEnabled').checked = !!config.telegram?.enabled;
+
+        try {
+          const orbInfo = await api('/api/orb-status');
+          if (orbInfo.ok && orbInfo.siteName) {
+            if (!siteNameEl.value.trim()) siteNameEl.value = orbInfo.siteName;
+            if (!siteIspEl.value.trim()) siteIspEl.value = orbInfo.isp;
+          }
+        } catch (_) {
+          // Ignore Orb auto-fill failures; user can still fill manually.
+        }
+      } catch (error) {
+        setStatus('Could not load settings: ' + error.message, 'error');
+      }
+    }
+
+    document.getElementById('saveBtn').addEventListener('click', async () => {
+      try {
+        const payload = {
+          site: {
+            name: document.getElementById('siteName').value.trim(),
+            isp: document.getElementById('siteIsp').value.trim()
+          },
+          statusNotes: {
+            summary: document.getElementById('summary').value.trim()
+          },
+          schedule: {
+            dailyReportHour: Number(document.getElementById('reportHour').value || 8),
+            dailyReportMinute: Number(document.getElementById('reportMinute').value || 0)
+          },
+          alerts: {
+            checkIntervalMinutes: Number(document.getElementById('checkInterval').value || 3),
+            degradedThreshold: Number(document.getElementById('degradedThreshold').value || 75)
+          },
+          whatsapp: {
+            enabled: document.getElementById('whatsappEnabled').checked,
+            recipientJid: document.getElementById('whatsappRecipient').value.trim()
+          },
+          telegram: {
+            enabled: document.getElementById('telegramEnabled').checked,
+            botToken: document.getElementById('telegramBotToken').value.trim(),
+            chatId: document.getElementById('telegramChatId').value.trim()
+          }
+        };
+
+        await api('/api/config', 'POST', payload);
+        setStatus('Settings saved successfully.', 'success');
+      } catch (error) {
+        setStatus('Save failed: ' + error.message, 'error');
+      }
+    });
+
+    document.getElementById('dryRunBtn').addEventListener('click', async () => {
+      try {
+        setStatus('Running dry-run test...', 'success');
+        const result = await api('/api/run', 'POST', { action: 'dry-run' });
+        setStatus(result.stdout || 'Dry-run completed successfully.', 'success');
+      } catch (error) {
+        setStatus('Dry-run failed: ' + error.message, 'error');
+      }
+    });
+
+    document.getElementById('pairWaBtn').addEventListener('click', async () => {
+      try {
+        const method = document.getElementById('pairMethod').value;
+        const phone = document.getElementById('pairPhone').value.trim();
+        setStatus('Starting WhatsApp pairing inside this page...', 'success');
+        const result = await api('/api/run', 'POST', {
+          action: 'pair-whatsapp-ui',
+          method,
+          phoneNumber: phone
+        });
+        setStatus(result.message || 'WhatsApp pairing started inside the app UI.', 'success');
+      } catch (error) {
+        setStatus('Pairing failed: ' + error.message, 'error');
+      }
+    });
+
+    async function refreshPairingState() {
+      try {
+        const state = await api('/api/pairing-state');
+        renderPairingState(state);
+      } catch (_) {}
+    }
+
+    setInterval(refreshPairingState, 2000);
+    loadConfig();
+    refreshPairingState();
+  </script>
+</body>
+</html>

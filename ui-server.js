@@ -1,0 +1,316 @@
+import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import net from 'node:net';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { getLocalOrbTelemetry } from './src/orbLocal.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = __dirname;
+const uiDir = path.join(rootDir, 'ui');
+const configPath = path.join(rootDir, 'config.json');
+const exampleConfigPath = path.join(rootDir, 'config.json.example');
+
+function getFreePort(startPort = 4173, maxAttempts = 25) {
+  return new Promise((resolve, reject) => {
+    const tryPort = (candidate) => {
+      const tester = net.createServer();
+      tester.once('error', (error) => {
+        if (error.code === 'EADDRINUSE' && candidate < startPort + maxAttempts) {
+          tryPort(candidate + 1);
+          return;
+        }
+        reject(error);
+      });
+      tester.once('listening', () => {
+        tester.close(() => resolve(candidate));
+      });
+      tester.listen(candidate);
+    };
+
+    tryPort(startPort);
+  });
+}
+
+const preferredPort = Number(process.env.PORT || 4173);
+const port = await getFreePort(preferredPort);
+
+function ensureConfigFile() {
+  if (!fs.existsSync(configPath) && fs.existsSync(exampleConfigPath)) {
+    const sample = fs.readFileSync(exampleConfigPath, 'utf8');
+    fs.writeFileSync(configPath, sample, 'utf8');
+  }
+}
+
+function readJsonFile(filePath) {
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+function sendJson(res, statusCode, payload) {
+  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify(payload));
+}
+
+async function saveConfig(request, res) {
+  try {
+    const raw = await new Promise((resolve, reject) => {
+      let body = '';
+      request.on('data', chunk => { body += chunk; if (body.length > 1_000_000) { reject(new Error('Payload too large')); request.destroy(); } });
+      request.on('end', () => resolve(body));
+      request.on('error', reject);
+    });
+
+    const payload = JSON.parse(raw || '{}');
+    const existing = readJsonFile(configPath) || readJsonFile(exampleConfigPath) || {};
+    const merged = {
+      ...existing,
+      ...payload,
+      site: { ...existing.site, ...payload.site },
+      performance: { ...existing.performance, ...payload.performance },
+      statusNotes: { ...existing.statusNotes, ...payload.statusNotes },
+      telegram: { ...existing.telegram, ...payload.telegram },
+      whatsapp: { ...existing.whatsapp, ...payload.whatsapp },
+      agent: { ...existing.agent, ...payload.agent },
+      alerts: { ...existing.alerts, ...payload.alerts },
+      schedule: { ...existing.schedule, ...payload.schedule }
+    };
+
+    fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf8');
+    sendJson(res, 200, { ok: true, message: 'Settings saved.' });
+  } catch (error) {
+    sendJson(res, 400, { ok: false, message: error.message || 'Invalid settings payload.' });
+  }
+}
+
+function runCommand(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: rootDir,
+      shell: true,
+      windowsHide: true
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', chunk => { stdout += chunk.toString(); });
+    child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+
+    child.on('close', code => {
+      if (code === 0) {
+        resolve({ ok: true, stdout, stderr });
+      } else {
+        reject(new Error(stderr || stdout || `Command failed with exit code ${code}`));
+      }
+    });
+
+    child.on('error', reject);
+  });
+}
+
+async function handleAction(action) {
+  switch (action) {
+    case 'dry-run':
+      return runCommand('node', ['agent.js', '--daily', '--dry-run']);
+    case 'daily':
+      return runCommand('node', ['agent.js', '--daily']);
+    case 'pair-whatsapp':
+    case 'pair-whatsapp-ui':
+      return { ok: true, message: 'Pairing started in the UI.' };
+    case 'pair-phone':
+      return runCommand('node', ['agent.js', '--phone', '00000000']);
+    default:
+      throw new Error('Unknown action');
+  }
+}
+
+async function runAction(request, res) {
+  try {
+    const raw = await new Promise((resolve, reject) => {
+      let body = '';
+      request.on('data', chunk => { body += chunk; if (body.length > 1_000_000) { reject(new Error('Payload too large')); request.destroy(); } });
+      request.on('end', () => resolve(body));
+      request.on('error', reject);
+    });
+
+    const payload = JSON.parse(raw || '{}');
+    const result = await handleAction(payload.action);
+    sendJson(res, 200, { ok: true, ...result });
+  } catch (error) {
+    sendJson(res, 500, { ok: false, message: error.message || 'Command execution failed.' });
+  }
+}
+
+function serveStaticFile(req, res, filePath) {
+  try {
+    const safePath = path.normalize(filePath);
+    if (!safePath.startsWith(uiDir)) {
+      throw new Error('Invalid path');
+    }
+
+    const content = fs.readFileSync(safePath);
+    const ext = path.extname(safePath).toLowerCase();
+    const mimeTypes = {
+      '.html': 'text/html; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.js': 'application/javascript; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.svg': 'image/svg+xml'
+    };
+
+    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
+    res.end(content);
+  } catch {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Not found');
+  }
+}
+
+const pairingState = {
+  status: 'idle',
+  mode: 'qr',
+  qrDataUrl: '',
+  code: '',
+  message: '',
+  connected: false
+};
+
+let pairingTask = null;
+
+async function startPairingProcess(method = 'qr', phoneNumber = '') {
+  if (pairingTask) {
+    return pairingTask;
+  }
+
+  pairingState.status = 'connecting';
+  pairingState.mode = method;
+  pairingState.qrDataUrl = '';
+  pairingState.code = '';
+  pairingState.message = method === 'code'
+    ? 'Waiting for the pairing code flow to complete.'
+    : 'Waiting for the QR code scan to complete.';
+  pairingState.connected = false;
+
+  const { pairWhatsAppInteractive } = await import('./src/whatsapp.js');
+  pairingTask = pairWhatsAppInteractive({
+    authFolder: './auth_info',
+    phoneNumber: method === 'code' ? phoneNumber : '',
+    forceReset: false,
+    openBrowser: false,
+    onProgress: (event) => {
+      if (event.type === 'qr') {
+        pairingState.status = 'waiting-for-qr';
+        pairingState.qrDataUrl = event.qrDataUrl || '';
+        pairingState.message = 'Scan the QR code inside WhatsApp on your phone.';
+      }
+      if (event.type === 'pairingCode') {
+        pairingState.status = 'waiting-for-code';
+        pairingState.code = event.code || '';
+        pairingState.message = 'Use the pairing code shown below in WhatsApp.';
+      }
+      if (event.type === 'connected') {
+        pairingState.status = 'connected';
+        pairingState.connected = true;
+        pairingState.message = 'WhatsApp is connected and ready.';
+      }
+    }
+  }).catch((error) => {
+    pairingState.status = 'error';
+    pairingState.message = error.message || 'WhatsApp pairing failed.';
+    throw error;
+  }).finally(() => {
+    pairingTask = null;
+  });
+
+  return pairingTask;
+}
+
+const server = http.createServer((req, res) => {
+  const url = new URL(req.url, `http://localhost:${port}`);
+
+  if (req.method === 'GET' && url.pathname === '/api/config') {
+    ensureConfigFile();
+    const config = readJsonFile(configPath) || readJsonFile(exampleConfigPath) || {};
+    sendJson(res, 200, config);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/orb-status') {
+    (async () => {
+      try {
+        const sites = await getLocalOrbTelemetry();
+        const first = Array.isArray(sites) ? sites[0] : null;
+        sendJson(res, 200, {
+          ok: true,
+          siteName: first?.name || '',
+          isp: first?.isp || '',
+          status: first?.status || 'UNKNOWN',
+          data: first || null
+        });
+      } catch (error) {
+        sendJson(res, 200, {
+          ok: false,
+          siteName: '',
+          isp: '',
+          message: error.message || 'Orb status unavailable.'
+        });
+      }
+    })();
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/pairing-state') {
+    sendJson(res, 200, pairingState);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/config') {
+    saveConfig(req, res);
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/run') {
+    (async () => {
+      try {
+        const raw = await new Promise((resolve, reject) => {
+          let body = '';
+          req.on('data', chunk => { body += chunk; if (body.length > 1_000_000) { reject(new Error('Payload too large')); req.destroy(); } });
+          req.on('end', () => resolve(body));
+          req.on('error', reject);
+        });
+
+        const payload = JSON.parse(raw || '{}');
+        if (payload.action === 'pair-whatsapp' || payload.action === 'pair-whatsapp-ui') {
+          await startPairingProcess(payload.method || 'qr', payload.phoneNumber || '');
+          sendJson(res, 200, { ok: true, message: 'WhatsApp pairing started in the app UI.' });
+          return;
+        }
+
+        const result = await handleAction(payload.action);
+        sendJson(res, 200, { ok: true, ...result });
+      } catch (error) {
+        sendJson(res, 500, { ok: false, message: error.message || 'Command execution failed.' });
+      }
+    })();
+    return;
+  }
+
+  let requestedPath = url.pathname === '/' ? '/index.html' : url.pathname;
+  requestedPath = requestedPath.replace(/^\/+/, '');
+  serveStaticFile(req, res, path.join(uiDir, requestedPath));
+});
+
+ensureConfigFile();
+server.listen(port, () => {
+  console.log(`Portable setup UI is running at http://localhost:${port}`);
+  console.log('If 4173 was in use, a free port was selected automatically.');
+  console.log('Use the browser to configure WhatsApp, Telegram, timing, and report settings.');
+});

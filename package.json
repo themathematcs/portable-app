@@ -1,0 +1,41 @@
+{
+  "name": "edge-site-reporter",
+  "version": "1.0.0",
+  "description": "Lightweight, resilient edge agent for remote site screenshot and status reporting via Telegram and WhatsApp",
+  "main": "agent.js",
+  "type": "module",
+  "scripts": {
+    "start": "node agent.js --daemon",
+    "daily": "node agent.js --daily",
+    "watchdog": "node agent.js --daemon",
+    "once": "node agent.js --once",
+    "test-alert": "node agent.js --test-alert",
+    "dry-run": "node agent.js --daily --dry-run",
+    "auth-wa": "node agent.js --auth-wa",
+    "auth-phone": "node agent.js --phone",
+    "test-capture": "node agent.js --test-capture",
+    "setup-ui": "node ui-server.js",
+    "start-ui": "node ui-server.js"
+  },
+  "keywords": [
+    "edge",
+    "monitoring",
+    "baileys",
+    "whatsapp",
+    "telegram",
+    "screenshot",
+    "iot"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.19",
+    "axios": "^1.7.9",
+    "form-data": "^4.0.2",
+    "pino": "^9.6.0",
+    "puppeteer": "^25.11.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "screenshot-desktop": "^1.15.2"
+  }
+}
