@@ -173,7 +173,7 @@ export async function runMultiSiteDailyReport(config, options = {}) {
       }
 
       // Format per-site caption
-      const caption = formatSiteCaption(site, dateStr, sites);
+      const caption = formatSiteCaption(site, dateStr, [site]);
 
       // Dispatch
       await dispatch(config, { imagePath, caption, dryRun });
