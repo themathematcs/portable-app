@@ -263,8 +263,8 @@
       <h2>Actions</h2>
       <div class="button-row">
         <button id="saveBtn">Save settings</button>
-        <button id="dryRunBtn" class="secondary">Run dry test</button>
-        <button id="reportBtn" class="secondary">Send report</button>
+        <button id="dryRunBtn" class="secondary">WhatsApp test</button>
+        <button id="reportBtn" class="secondary">Send full report</button>
         <button id="pairWaBtn" class="secondary">Pair WhatsApp</button>
       </div>
       <div id="pairPanel" class="pair-panel">
@@ -403,9 +403,9 @@
 
     document.getElementById('dryRunBtn').addEventListener('click', async () => {
       try {
-        setStatus('Sending live WhatsApp test message...', 'success');
+        setStatus('Sending WhatsApp connectivity test...', 'success');
         const result = await api('/api/run', 'POST', { action: 'test-whatsapp' });
-        setStatus(result.stdout || 'Live WhatsApp test message sent successfully.', 'success');
+        setStatus(result.stdout || 'WhatsApp connectivity test sent successfully.', 'success');
       } catch (error) {
         setStatus('WhatsApp test failed: ' + error.message, 'error');
       }
@@ -413,11 +413,12 @@
 
     document.getElementById('reportBtn').addEventListener('click', async () => {
       try {
-        setStatus('Starting Orb report with screenshot and metrics...', 'success');
+        setStatus('Starting full Orb report with screenshot and metrics...', 'success');
         const result = await api('/api/run', 'POST', { action: 'send-report' });
-        setStatus(result.stdout || 'Full Orb report completed successfully.', 'success');
+        const text = (result.stdout || '').trim() || 'Full Orb report completed successfully.';
+        setStatus(text, 'success');
       } catch (error) {
-        setStatus('Report failed: ' + error.message, 'error');
+        setStatus('Full report failed: ' + error.message, 'error');
       }
     });
 
