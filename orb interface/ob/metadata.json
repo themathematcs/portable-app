@@ -1,0 +1,7 @@
+{
+  "name": "Orb Score Network Monitor",
+  "description": "Real-time client network monitoring dashboard with Orb Score telemetry and ISP status visualization.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

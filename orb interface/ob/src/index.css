@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #0e0725;
+    color: #ffffff;
+  }
+}
+
+@keyframes orb-orbit {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-orb-orbit {
+  animation: orb-orbit 8s linear infinite;
+}
+
+.animate-orb-orbit-slow {
+  animation: orb-orbit 14s linear infinite;
+}
+
+/* Custom glow effects and scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f0727;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #37216a;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #503196;
+}
