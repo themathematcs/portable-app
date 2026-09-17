@@ -8,10 +8,14 @@ import { createConnection } from 'node:net';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
 
-const CLONE_APP_DIR = path.resolve(
-  'C:\\Users\\chriz\\OneDrive\\Desktop\\workflow automation 1\\orb interface\\ob'
-);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const APP_ROOT = path.resolve(__dirname, '..');
+const CLONE_APP_DIR = process.env.ORB_CLONE_DIR
+  ? path.resolve(process.env.ORB_CLONE_DIR)
+  : path.resolve(APP_ROOT, 'orb interface', 'ob');
 const DEFAULT_CLONE_PORT = 4173;
 const CLONE_PORT_RANGE_SIZE = 25;
 const SERVER_START_TIMEOUT_MS = 45_000;
@@ -19,6 +23,9 @@ const SERVER_START_TIMEOUT_MS = 45_000;
 let devServerProcess = null;
 
 export const NAME_TO_CLONE_ID = {
+  'sky4':                                 'blackbird',
+  'black-bird-hq9':                       'blackbird',
+  'blackbird':                            'blackbird',
   'cozlins':                              'cozlins',
   'bbhouse client monitor':               'bbhouse',
   'brookeveg muthaite client monitor':    'brookeveg',
@@ -30,7 +37,6 @@ export const NAME_TO_CLONE_ID = {
   'karen hub client monitor':             'karen-hub',
   'lavington point monitor':              'lavington',
   'nyali coastal monitor':                'nyali',
-  'black-bird-hq9':                       'blackbird',
 };
 
 export function getCloneRuntimeConfig(overrides = {}) {
