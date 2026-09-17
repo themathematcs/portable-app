@@ -141,6 +141,28 @@
       margin-top: 12px;
       line-height: 1.5;
     }
+    .setting-status {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      font-size: 0.82rem;
+      background: #f8fbff;
+      color: var(--ink);
+      line-height: 1.5;
+      display: none;
+    }
+    .setting-status.visible { display: block; }
+    .setting-status.ok {
+      background: #eefcf4;
+      border-color: #cfeedd;
+      color: #1d6f43;
+    }
+    .setting-status.error {
+      background: #fff1f1;
+      border-color: #ffd6d2;
+      color: #8a2d25;
+    }
     .pair-panel {
       margin-top: 18px;
       border: 1px solid var(--line);
@@ -194,6 +216,7 @@
           <label for="summary">Status summary</label>
           <input id="summary" type="text" />
         </div>
+        <div id="orbDetectionStatus" class="setting-status"></div>
       </div>
 
       <div class="card">
@@ -282,6 +305,7 @@
 
   <script>
     const statusBox = document.getElementById('statusBox');
+    const orbDetectionStatus = document.getElementById('orbDetectionStatus');
     const pairPanel = document.getElementById('pairPanel');
     const pairStatusText = document.getElementById('pairStatusText');
     const pairQrWrap = document.getElementById('pairQrWrap');
@@ -292,6 +316,21 @@
     function setStatus(message, type = 'success') {
       statusBox.textContent = message;
       statusBox.className = `status visible ${type}`;
+    }
+
+    function renderOrbDetectionState(state) {
+      if (!state) {
+        orbDetectionStatus.className = 'setting-status';
+        orbDetectionStatus.textContent = '';
+        return;
+      }
+
+      const msg = state.ok
+        ? `Orb detected and reachable${state.executablePath ? ` at ${state.executablePath}` : ''}.`
+        : `Orb not detected. ${state.failureReason || state.message || 'Check the installation path.'}${state.searchedPaths?.length ? ` Searched: ${state.searchedPaths.slice(0, 8).join(' | ')}` : ''}`;
+
+      orbDetectionStatus.className = `setting-status visible ${state.ok ? 'ok' : 'error'}`;
+      orbDetectionStatus.textContent = msg;
     }
 
     function renderPairingState(state) {
@@ -353,12 +392,13 @@
 
         try {
           const orbInfo = await api('/api/orb-status');
+          renderOrbDetectionState(orbInfo);
           if (orbInfo.ok && orbInfo.siteName) {
             if (!siteNameEl.value.trim()) siteNameEl.value = orbInfo.siteName;
             if (!siteIspEl.value.trim()) siteIspEl.value = orbInfo.isp;
           }
-        } catch (_) {
-          // Ignore Orb auto-fill failures; user can still fill manually.
+        } catch (error) {
+          renderOrbDetectionState({ ok: false, message: error.message, searchedPaths: [], failureReason: error.message });
         }
       } catch (error) {
         setStatus('Could not load settings: ' + error.message, 'error');

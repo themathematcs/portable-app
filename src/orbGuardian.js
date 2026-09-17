@@ -14,8 +14,102 @@ const ORB_EXECUTABLE_CANDIDATES = [
   'C:/Program Files/Orb/Orb.exe',
   'C:/Program Files (x86)/Orb/Orb.exe',
   'C:/Program Files/Orb App/Orb.exe',
-  'C:/Program Files (x86)/Orb App/Orb.exe'
+  'C:/Program Files (x86)/Orb App/Orb.exe',
+  'C:/ProgramData/Orb/Orb.exe',
+  'C:/Users/Orb/Orb.exe'
 ];
+
+const ORB_SEARCH_ROOTS = () => {
+  const roots = [];
+  if (process.env.ProgramFiles) roots.push(process.env.ProgramFiles);
+  if (process.env['ProgramFiles(x86)']) roots.push(process.env['ProgramFiles(x86)']);
+  if (process.env.ProgramData) roots.push(process.env.ProgramData);
+  if (process.env.USERPROFILE) roots.push(process.env.USERPROFILE);
+  if (process.env.LOCALAPPDATA) roots.push(process.env.LOCALAPPDATA);
+  if (process.env.PUBLIC) roots.push(process.env.PUBLIC);
+  return [...new Set(roots.filter(Boolean))];
+};
+
+export async function discoverOrbExecutable() {
+  const searchedPaths = [...new Set([...ORB_EXECUTABLE_CANDIDATES, ...ORB_SEARCH_ROOTS()])];
+  const result = {
+    found: false,
+    executablePath: null,
+    searchedPaths: [],
+    appIds: [...ORB_APP_SHELL_IDS],
+    error: null
+  };
+
+  const script = [
+    "$orbAppIds = @('shell:AppsFolder\\Orb_rwe8ryttnqs9e!ORB','Orb','Orb.exe');",
+    "$orbPaths = @('C:/Program Files/Orb/Orb.exe','C:/Program Files (x86)/Orb/Orb.exe','C:/Program Files/Orb App/Orb.exe','C:/Program Files (x86)/Orb App/Orb.exe','C:/ProgramData/Orb/Orb.exe');",
+    "$roots = @();",
+    "if ($env:ProgramFiles) { $roots += $env:ProgramFiles }",
+    "if (${env:ProgramFiles(x86)}) { $roots += ${env:ProgramFiles(x86)} }",
+    "if ($env:ProgramData) { $roots += $env:ProgramData }",
+    "if ($env:USERPROFILE) { $roots += $env:USERPROFILE }",
+    "if ($env:LOCALAPPDATA) { $roots += $env:LOCALAPPDATA }",
+    "if ($env:PUBLIC) { $roots += $env:PUBLIC }",
+    "foreach ($id in $orbAppIds) {",
+    "  try {",
+    "    $cmd = Get-Command $id -ErrorAction Stop;",
+    "    if ($cmd -and $cmd.Source) {",
+    "      Write-Output \"FOUND:$($cmd.Source)\";",
+    "      return;",
+    "    }",
+    "  } catch {}",
+    "}",
+    "foreach ($p in $orbPaths) {",
+    "  if (Test-Path $p) {",
+    "    Write-Output \"FOUND:$p\";",
+    "    return;",
+    "  }",
+    "}",
+    "foreach ($root in $roots) {",
+    "  if ($root -and (Test-Path $root)) {",
+    "    foreach ($candidate in (Get-ChildItem -Path $root -Filter 'Orb.exe' -Recurse -ErrorAction SilentlyContinue -File | Select-Object -ExpandProperty FullName)) {",
+    "      Write-Output \"SEARCHED:$candidate\";",
+    "    }",
+    "  }",
+    "}",
+    "Write-Output 'NOT_FOUND'"
+  ].join(' ');
+
+  try {
+    const { stdout } = await execAsync(`powershell -NoProfile -Command "${script.replace(/\r?\n/g, ' ')}"`);
+    const lines = (stdout || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+
+    for (const line of lines) {
+      if (line.startsWith('FOUND:')) {
+        result.found = true;
+        result.executablePath = line.replace('FOUND:', '').trim();
+        break;
+      }
+      if (line.startsWith('SEARCHED:')) {
+        result.searchedPaths.push(line.replace('SEARCHED:', '').trim());
+      }
+    }
+
+    if (!result.found) {
+      result.error = `Orb executable was not found. Checked standard install folders and app IDs.`;
+      const uniqueSearches = [...new Set([
+        ...searchedPaths,
+        ...result.searchedPaths,
+        ...result.appIds
+      ])];
+      result.searchedPaths = uniqueSearches.filter(Boolean);
+    }
+  } catch (error) {
+    result.error = `Orb detection failed: ${error.message}`;
+    result.searchedPaths = [...new Set(searchedPaths)];
+  }
+
+  if (result.found && !result.executablePath) {
+    result.executablePath = result.searchedPaths.find((value) => value.toLowerCase().endsWith('orb.exe')) || null;
+  }
+
+  return result;
+}
 
 /**
  * Checks if the Orb process is currently running on the system.
@@ -65,29 +159,41 @@ export async function ensureOrbRunning({ autoLaunch = true, maxWaitMs = 8000 } =
     };
   }
 
+  const discovery = await discoverOrbExecutable();
+
   if (!autoLaunch) {
     return {
       isRunning: false,
       pid: null,
       autoStarted: false,
-      error: 'Orb process is not running (auto-launch disabled).'
+      error: discovery.error || 'Orb process is not running (auto-launch disabled).',
+      searchedPaths: discovery.searchedPaths,
+      executablePath: discovery.executablePath,
+      appIds: discovery.appIds
     };
   }
 
-  console.log(`[Orb Guardian] ⚠️ Orb process is NOT running. Initiating auto-launch...`);
+  if (!discovery.found || !discovery.executablePath) {
+    const noLaunchMessage = discovery.error || 'Orb installation path or app identifier could not be found on this machine.';
+    console.error(`[Orb Guardian] ${noLaunchMessage}`);
+    return {
+      isRunning: false,
+      pid: null,
+      autoStarted: false,
+      error: noLaunchMessage,
+      searchedPaths: discovery.searchedPaths,
+      executablePath: discovery.executablePath,
+      appIds: discovery.appIds
+    };
+  }
+
+  console.log(`[Orb Guardian] ⚠️ Orb process is NOT running. Initiating auto-launch using ${discovery.executablePath}...`);
 
   try {
-    const launchCmd = `powershell -NoProfile -Command "${[
-      "$orbAppIds = @('shell:AppsFolder\\Orb_rwe8ryttnqs9e!ORB','Orb','Orb.exe');",
-      "$orbPaths = @('C:/Program Files/Orb/Orb.exe','C:/Program Files (x86)/Orb/Orb.exe','C:/Program Files/Orb App/Orb.exe','C:/Program Files (x86)/Orb App/Orb.exe');",
-      "foreach ($id in $orbAppIds) { try { Start-Process $id -ErrorAction Stop; Write-Output \"LAUNCHED:$id\"; return } catch {} }",
-      "foreach ($p in $orbPaths) { if (Test-Path $p) { try { Start-Process $p -ErrorAction Stop; Write-Output \"LAUNCHED:$p\"; return } catch {} } }",
-      "Write-Output 'NO_LAUNCH_CANDIDATE'"
-    ].join(' ')}"`;
-
+    const launchCmd = `powershell -NoProfile -Command "Start-Process '${discovery.executablePath.replace(/'/g, "''")}' -ErrorAction Stop; Write-Output 'LAUNCHED:${discovery.executablePath}'"`;
     const { stdout } = await execAsync(launchCmd);
-    if (stdout && stdout.includes('NO_LAUNCH_CANDIDATE')) {
-      throw new Error('Orb installation path or app identifier could not be found on this machine.');
+    if (stdout && stdout.includes('LAUNCHED:')) {
+      console.log(`[Orb Guardian] ${stdout.trim()}`);
     }
   } catch (launchErr) {
     console.error(`[Orb Guardian] Failed to launch Orb: ${launchErr.message}`);
@@ -95,7 +201,10 @@ export async function ensureOrbRunning({ autoLaunch = true, maxWaitMs = 8000 } =
       isRunning: false,
       pid: null,
       autoStarted: true,
-      error: `Auto-launch command failed: ${launchErr.message}`
+      error: `Auto-launch command failed: ${launchErr.message}`,
+      searchedPaths: discovery.searchedPaths,
+      executablePath: discovery.executablePath,
+      appIds: discovery.appIds
     };
   }
 

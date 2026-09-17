@@ -5,6 +5,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getLocalOrbTelemetry } from './src/orbLocal.js';
+import { discoverOrbExecutable } from './src/orbGuardian.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -249,6 +250,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && url.pathname === '/api/orb-status') {
     (async () => {
       try {
+        const discovery = await discoverOrbExecutable();
         const sites = await getLocalOrbTelemetry();
         const first = Array.isArray(sites) ? sites[0] : null;
         sendJson(res, 200, {
@@ -256,14 +258,26 @@ const server = http.createServer((req, res) => {
           siteName: first?.name || '',
           isp: first?.isp || '',
           status: first?.status || 'UNKNOWN',
-          data: first || null
+          data: first || null,
+          executablePath: discovery.executablePath || null,
+          searchedPaths: discovery.searchedPaths || [],
+          message: `Orb detected at ${discovery.executablePath || 'unknown location'} and summary data loaded successfully.`
         });
       } catch (error) {
+        const discovery = await discoverOrbExecutable().catch(() => ({
+          executablePath: null,
+          searchedPaths: [],
+          error: 'Orb discovery failed.'
+        }));
         sendJson(res, 200, {
           ok: false,
           siteName: '',
           isp: '',
-          message: error.message || 'Orb status unavailable.'
+          status: 'FAILED',
+          message: error.message || 'Orb status unavailable.',
+          executablePath: discovery.executablePath || null,
+          searchedPaths: discovery.searchedPaths || [],
+          failureReason: discovery.error || error.message || 'Orb status unavailable.'
         });
       }
     })();
