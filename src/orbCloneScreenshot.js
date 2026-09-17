@@ -65,7 +65,10 @@ export function resolveCloneId(siteName, siteId) {
   for (const [k, v] of Object.entries(NAME_TO_CLONE_ID)) {
     if (candidates.some((key) => key.includes(k) || k.includes(key))) return v;
   }
-  return null;
+  const fallback = siteId || siteName;
+  return fallback
+    ? String(fallback).toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    : null;
 }
 
 function isPortOpen(port, timeoutMs = 2000) {
