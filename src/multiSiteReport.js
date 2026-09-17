@@ -153,19 +153,18 @@ export async function runMultiSiteDailyReport(config, options = {}) {
 
       // Resolve to clone app ID
       const cloneId = resolveCloneId(site.name, site.id);
-      console.log(`[Site] Clone ID: ${cloneId || '(none — fallback card)'}`);
+      console.log(`[Site] Clone ID: ${cloneId || '(none — real Orb interface missing)'}`);
 
-      // Screenshot from clone app (or null for fallback)
       let imagePath = null;
-      if (cloneId) {
+      if (!cloneId) {
+        throw new Error(`No Orb clone mapping exists for site "${site.name}". Please map the site to the real Orb interface entry.`);
+      }
+
+      try {
         imagePath = await getCloneScreenshot(cloneId, site.name, site);
-      } else {
-        console.log(`[Site] No clone mapping for ${site.name}; generating fallback card.`);
-        try {
-          imagePath = await generateFallbackSiteCard(site);
-        } catch (err) {
-          console.error(`[Site] Fallback card failed for ${site.name}: ${err.message}`);
-        }
+      } catch (err) {
+        console.error(`[Site] Clone screenshot failed for ${site.name}: ${err.message}`);
+        throw new Error(`The actual Orb interface workflow failed for ${site.name}. Please make sure the Orb clone app is installed and running.`);
       }
 
       if (imagePath) tmpFiles.push(imagePath);

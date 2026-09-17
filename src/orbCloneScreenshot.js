@@ -95,6 +95,45 @@ async function waitForPort(port, timeoutMs = SERVER_START_TIMEOUT_MS) {
   return false;
 }
 
+async function installCloneDependencies() {
+  const packageJsonPath = path.join(CLONE_APP_DIR, 'package.json');
+  if (!fs.existsSync(packageJsonPath)) {
+    throw new Error(`[Clone] Orb interface package not found at ${CLONE_APP_DIR}.`);
+  }
+
+  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  console.log(`[Clone] Installing Orb interface dependencies in ${CLONE_APP_DIR}...`);
+
+  await new Promise((resolve, reject) => {
+    const child = spawn(npmCommand, ['install'], {
+      cwd: CLONE_APP_DIR,
+      shell: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout?.on('data', (d) => {
+      const text = d.toString();
+      stdout += text;
+      if (text.trim()) console.log(`[Clone/npm] ${text.trim()}`);
+    });
+
+    child.stderr?.on('data', (d) => {
+      const text = d.toString();
+      stderr += text;
+      if (text.trim()) console.warn(`[Clone/npm:err] ${text.trim()}`);
+    });
+
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(stderr || stdout || `npm install failed with exit code ${code}`));
+    });
+    child.on('error', reject);
+  });
+}
+
 export async function ensureCloneServerRunning(overrides = {}) {
   const runtime = getCloneRuntimeConfig(overrides);
   const port = runtime.port;
@@ -115,7 +154,7 @@ export async function ensureCloneServerRunning(overrides = {}) {
 
   const nmPath = path.join(CLONE_APP_DIR, 'node_modules');
   if (!fs.existsSync(nmPath)) {
-    throw new Error(`[Clone] node_modules missing at ${nmPath}. Run: npm install inside the orb interface/ob directory.`);
+    await installCloneDependencies();
   }
 
   console.log(`[Clone] Starting Vite dev server in ${CLONE_APP_DIR} on port ${port} ...`);
