@@ -27,6 +27,8 @@
     "maxRetries": 3
   },
   "orb": {
+    "apiToken": "",
+    "apiUrl": "https://panel.orb.net",
     "configDir": "",
     "certificatePath": "",
     "privateKeyPath": ""

@@ -58,6 +58,10 @@ This keeps the pairing experience inside the app instead of sending you to a sep
 
 The app checks the local Orb installation and reads the site name, ISP, and system status automatically when available. That allows a smoother setup for machines that already have Orb installed and running.
 
+## Optional Orb API key
+
+An Orb API key can be entered in the local setup UI or supplied on the target computer as `ORB_API_TOKEN`. The key is not required for local certificate telemetry. Do not paste it into chat, commit it to Git, or place it in a public repository. The local `config.json` file is ignored by Git.
+
 ## Important notes
 
 - The real Orb certificate and local auth files are not meant to be committed to a public repository.

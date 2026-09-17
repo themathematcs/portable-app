@@ -222,6 +222,14 @@
       <div class="card">
         <h2>Orb certificate</h2>
         <div class="field">
+          <label for="orbApiToken">Orb API key</label>
+          <input id="orbApiToken" type="password" autocomplete="off" placeholder="Optional account API key" />
+        </div>
+        <div class="field">
+          <label for="orbApiUrl">Orb API URL</label>
+          <input id="orbApiUrl" type="url" placeholder="https://panel.orb.net" />
+        </div>
+        <div class="field">
           <label for="orbConfigDir">Orb config folder</label>
           <input id="orbConfigDir" type="text" placeholder="C:\\Users\\your-name\\.config\\orb" />
         </div>
@@ -410,6 +418,7 @@
         siteNameEl.value = config.site?.name || '';
         siteIspEl.value = config.site?.isp || '';
         document.getElementById('orbConfigDir').value = config.orb?.configDir || '';
+        document.getElementById('orbApiUrl').value = config.orb?.apiUrl || 'https://panel.orb.net';
         document.getElementById('orbCertificatePath').value = config.orb?.certificatePath || '';
         document.getElementById('orbPrivateKeyPath').value = config.orb?.privateKeyPath || '';
         document.getElementById('summary').value = config.statusNotes?.summary || '';
@@ -466,6 +475,8 @@
             chatId: document.getElementById('telegramChatId').value.trim()
           },
           orb: {
+            apiToken: document.getElementById('orbApiToken').value.trim(),
+            apiUrl: document.getElementById('orbApiUrl').value.trim(),
             configDir: document.getElementById('orbConfigDir').value.trim(),
             certificatePath: document.getElementById('orbCertificatePath').value.trim(),
             privateKeyPath: document.getElementById('orbPrivateKeyPath').value.trim()
