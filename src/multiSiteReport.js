@@ -21,6 +21,7 @@ import { sendTelegramReport } from './telegram.js';
 import { formatDate } from './formatter.js';
 
 const INTER_SITE_DELAY_MS = 2000;
+let reportInProgress = false;
 
 /**
  * Format a concise single-site WhatsApp caption from live local Orb data.
@@ -135,6 +136,11 @@ export async function runMultiSiteDailyReport(config, options = {}) {
   const { dryRun = false } = options;
   const dateStr = formatDate(new Date());
 
+  if (reportInProgress) {
+    throw new Error('A report is already running. The one-at-a-time report service is busy.');
+  }
+  reportInProgress = true;
+
   console.log(`\n=================================================`);
   console.log(`[Daily Report] Starting Per-Site Reporting Cycle`);
   console.log(`=================================================`);
@@ -143,13 +149,12 @@ export async function runMultiSiteDailyReport(config, options = {}) {
   const sites = await getAllSitesTelemetry(config);
   console.log(`[Daily Report] Read ${sites.length} local Orb site(s).`);
 
-  const tmpFiles = [];
-
   try {
     // 2. Per-site loop
     for (let i = 0; i < sites.length; i++) {
       const site = sites[i];
       console.log(`\n[Site ${i + 1}/${sites.length}] Processing: ${site.name}`);
+      console.log('[Queue] One device active: capture -> send -> cleanup.');
 
       // Resolve to clone app ID
       const cloneId = resolveCloneId(site.name, site.id);
@@ -167,13 +172,20 @@ export async function runMultiSiteDailyReport(config, options = {}) {
         throw new Error(`The actual Orb interface workflow failed for ${site.name}. Please make sure the Orb clone app is installed and running.`);
       }
 
-      if (imagePath) tmpFiles.push(imagePath);
-
       // Format per-site caption
       const caption = formatSiteCaption(site, dateStr, sites);
 
       // Dispatch
       await dispatch(config, { imagePath, caption, dryRun });
+
+      if (imagePath && fs.existsSync(imagePath)) {
+        try {
+          fs.unlinkSync(imagePath);
+          console.log(`[Queue] Released screenshot for ${site.name}.`);
+        } catch (error) {
+          console.warn(`[Queue] Could not release screenshot for ${site.name}: ${error.message}`);
+        }
+      }
 
       // Rate-limit delay between sites
       if (i < sites.length - 1) {
@@ -186,11 +198,8 @@ export async function runMultiSiteDailyReport(config, options = {}) {
     return { success: true, sites };
 
   } finally {
-    // Cleanup temp screenshots
-    for (const f of tmpFiles) {
-      try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
-    }
     // Stop the clone dev server if we started it
     stopCloneServer();
+    reportInProgress = false;
   }
 }
