@@ -163,7 +163,7 @@ export async function runMultiSiteDailyReport(config, options = {}) {
   console.log(`=================================================`);
 
   const sites = await getAllSitesTelemetry(config);
-  console.log(`[Daily Report] Read ${sites.length} local Orb site(s).`);
+  console.log(`[Daily Report] Read ${sites.length} Orb site(s).`);
 
   try {
     const caption = formatSiteCaption(sites[0] || { name: 'Orb Network', status: 'ONLINE', score: 0 }, dateStr, sites, config);
