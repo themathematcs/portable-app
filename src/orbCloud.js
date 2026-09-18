@@ -61,21 +61,42 @@ async function getJson(url, apiToken) {
 
 export async function getOrbCloudTelemetry(config) {
   const apiToken = config.orb?.apiToken;
-  if (!apiToken) return null;
-  const apiUrl = (config.orb.apiUrl || DEFAULT_API_URL).replace(/\/$/, '');
-  const organizations = await getJson(`${apiUrl}/api/v2/organizations`, apiToken);
-  const organizationList = Array.isArray(organizations) ? organizations : organizations.organizations || [];
-  if (organizationList.length === 0) throw new Error('Orb Cloud API returned no organizations. Check Organizations: Read permission.');
-
-  const sites = [];
-  for (const organization of organizationList) {
-    const organizationId = organization.organization_id || organization.id;
-    if (!organizationId) continue;
-    const devices = await getJson(`${apiUrl}/api/v2/organization/${encodeURIComponent(organizationId)}/devices`, apiToken);
-    const deviceList = Array.isArray(devices) ? devices : devices.devices || [];
-    sites.push(...deviceList.map(normalizeCloudDevice));
+  if (!apiToken) {
+    console.warn('[Orb Cloud Debug] getOrbCloudTelemetry called without an API token.');
+    return null;
   }
-  if (sites.length === 0) throw new Error('Orb Cloud API returned no devices. Check Devices: Read permission and Space access.');
-  console.log(`[Orb Cloud] Read ${sites.length} device(s) across ${organizationList.length} organization(s).`);
-  return sites;
+
+  const apiUrl = (config.orb.apiUrl || DEFAULT_API_URL).replace(/\/$/, '');
+  console.log(`[Orb Cloud Debug] apiToken present=${Boolean(apiToken)} | length=${apiToken.length} | endpoint=${apiUrl}/api/v2/organizations`);
+
+  try {
+    const organizations = await getJson(`${apiUrl}/api/v2/organizations`, apiToken);
+    const organizationList = Array.isArray(organizations) ? organizations : organizations.organizations || [];
+    console.log(`[Orb Cloud Debug] org response items=${organizationList.length}`);
+    if (organizationList.length === 0) throw new Error('Orb Cloud API returned no organizations. Check Organizations: Read permission.');
+
+    const sites = [];
+    for (const organization of organizationList) {
+      const organizationId = organization.organization_id || organization.id;
+      if (!organizationId) continue;
+      const devicesUrl = `${apiUrl}/api/v2/organization/${encodeURIComponent(organizationId)}/devices`;
+      console.log(`[Orb Cloud Debug] Requesting devices at ${devicesUrl}`);
+      try {
+        const devices = await getJson(devicesUrl, apiToken);
+        const deviceList = Array.isArray(devices) ? devices : devices.devices || [];
+        console.log(`[Orb Cloud Debug] Organization ${organizationId} returned ${deviceList.length} device(s).`);
+        sites.push(...deviceList.map(normalizeCloudDevice));
+      } catch (deviceErr) {
+        console.error(`[Orb Cloud Debug] Device fetch failed for org ${organizationId}: ${deviceErr.message}`);
+        throw deviceErr;
+      }
+    }
+
+    if (sites.length === 0) throw new Error('Orb Cloud API returned no devices. Check Devices: Read permission and Space access.');
+    console.log(`[Orb Cloud] Read ${sites.length} device(s) across ${organizationList.length} organization(s).`);
+    return sites;
+  } catch (err) {
+    console.error(`[Orb Cloud Debug] Cloud request failed: ${err.message}`);
+    throw err;
+  }
 }
