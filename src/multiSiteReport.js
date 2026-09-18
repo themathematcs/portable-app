@@ -159,19 +159,21 @@ export async function runMultiSiteDailyReport(config, options = {}) {
   reportInProgress = true;
 
   console.log(`\n=================================================`);
-  console.log(`[Daily Report] Starting All-Sites Summary Cycle`);
+  console.log(`[Daily Report] Starting Per-Site Summary Cycle`);
   console.log(`=================================================`);
 
   const sites = await getAllSitesTelemetry(config);
   console.log(`[Daily Report] Read ${sites.length} Orb site(s).`);
 
   try {
-    const caption = formatSiteCaption(sites[0] || { name: 'Orb Network', status: 'ONLINE', score: 0 }, dateStr, sites, config);
+    const sent = [];
 
-    let imagePath = null;
-    if (sites.length > 0) {
-      const site = sites[0];
+    for (let index = 0; index < sites.length; index += 1) {
+      const site = sites[index];
+      const caption = formatSiteCaption(site, dateStr, [site], config);
       const cloneId = resolveCloneId(site.name, site.id);
+      let imagePath = null;
+
       console.log(`[Daily Summary] Selected report site: ${site.name || site.id || 'unknown'} | Clone ID: ${cloneId || '(none — fallback card)'}`);
 
       if (cloneId) {
@@ -179,40 +181,46 @@ export async function runMultiSiteDailyReport(config, options = {}) {
           imagePath = await getCloneScreenshot(cloneId, site.name, site);
           console.log(`[Daily Summary] Using real Orb interface screenshot: ${imagePath}`);
         } catch (cloneError) {
-          console.warn(`[Daily Summary] Clone screenshot failed: ${cloneError.message}. Falling back to generated dashboard.`);
-
-          const summaryPath = path.resolve(os.tmpdir(), `orb_multi_site_summary_${Date.now()}.png`);
+          console.warn(`[Daily Summary] Clone screenshot failed: ${cloneError.message}. Falling back to generated site card.`);
           try {
-            imagePath = await generateMultiSiteCard(summaryPath, sites, dateStr);
-            console.log(`[Daily Summary] Generated fallback dashboard image: ${imagePath}`);
-          } catch (summaryError) {
-            console.warn(`[Daily Summary] Multi-site dashboard generation failed: ${summaryError.message}`);
+            imagePath = await generateFallbackSiteCard(site);
+            console.log(`[Daily Summary] Generated fallback site card image: ${imagePath}`);
+          } catch (fallbackError) {
+            console.warn(`[Daily Summary] Fallback site card generation failed: ${fallbackError.message}`);
           }
         }
       } else {
-        const summaryPath = path.resolve(os.tmpdir(), `orb_multi_site_summary_${Date.now()}.png`);
         try {
-          imagePath = await generateMultiSiteCard(summaryPath, sites, dateStr);
-          console.log(`[Daily Summary] No clone mapping; generated fallback dashboard image: ${imagePath}`);
-        } catch (summaryError) {
-          console.warn(`[Daily Summary] Multi-site dashboard generation failed: ${summaryError.message}`);
+          imagePath = await generateFallbackSiteCard(site);
+          console.log(`[Daily Summary] No clone mapping; generated fallback site card image: ${imagePath}`);
+        } catch (fallbackError) {
+          console.warn(`[Daily Summary] Fallback site card generation failed: ${fallbackError.message}`);
         }
       }
-    }
 
-    await dispatch(config, { imagePath, caption, dryRun });
+      await dispatch(config, { imagePath, caption, dryRun });
+      sent.push({
+        site: site.name || site.id || 'unknown',
+        imagePath,
+        caption
+      });
 
-    if (imagePath && fs.existsSync(imagePath)) {
-      try {
-        fs.unlinkSync(imagePath);
-        console.log('[Daily Summary] Released summary screenshot.');
-      } catch (error) {
-        console.warn(`[Daily Summary] Could not release summary screenshot: ${error.message}`);
+      if (imagePath && fs.existsSync(imagePath)) {
+        try {
+          fs.unlinkSync(imagePath);
+          console.log('[Daily Summary] Released site screenshot.');
+        } catch (error) {
+          console.warn(`[Daily Summary] Could not release site screenshot: ${error.message}`);
+        }
+      }
+
+      if (index < sites.length - 1 && !dryRun) {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
       }
     }
 
-    console.log(`\n[Daily Report] Summary cycle complete. 1 all-sites report sent.`);
-    return { success: true, sites };
+    console.log(`\n[Daily Report] Per-site report cycle complete. ${sent.length} site(s) processed.`);
+    return { success: true, sites, sent };
 
   } finally {
     stopCloneServer();
