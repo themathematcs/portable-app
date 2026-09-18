@@ -133,15 +133,16 @@ export function loadConfig(configPath) {
       certificatePath: process.env.ORB_CERTIFICATE_PATH || rawConfig.orb?.certificatePath || '',
       privateKeyPath: process.env.ORB_PRIVATE_KEY_PATH || rawConfig.orb?.privateKeyPath || ''
     },
-    alerts: rawConfig.alerts || {
-      enabled: true,
-      checkIntervalMinutes: 3,
-      degradedThreshold: 75,
-      cooldownMinutes: 60
+    alerts: {
+      enabled: rawConfig.alerts?.enabled ?? true,
+      checkIntervalMinutes: Number(rawConfig.alerts?.checkIntervalMinutes) || 3,
+      degradedThreshold: Number(rawConfig.alerts?.degradedThreshold) || 75,
+      cooldownMinutes: Number(rawConfig.alerts?.cooldownMinutes) || 60
     },
-    schedule: rawConfig.schedule || {
-      dailyReportHour: 8,
-      dailyReportMinute: 0
+    schedule: {
+      dailyReportEnabled: rawConfig.schedule?.dailyReportEnabled ?? true,
+      dailyReportHour: Number(rawConfig.schedule?.dailyReportHour) || 8,
+      dailyReportMinute: Number(rawConfig.schedule?.dailyReportMinute) || 0
     },
     reporting: {
       ...DEFAULT_REPORTING,

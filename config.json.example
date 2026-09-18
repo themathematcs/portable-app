@@ -37,5 +37,16 @@
     "reportScheduleCron": "0 8 * * *",
     "tempImagePath": "./report_img.png",
     "cleanUpOnFailure": true
+  },
+  "alerts": {
+    "enabled": true,
+    "checkIntervalMinutes": 3,
+    "degradedThreshold": 75,
+    "cooldownMinutes": 60
+  },
+  "schedule": {
+    "dailyReportEnabled": true,
+    "dailyReportHour": 8,
+    "dailyReportMinute": 0
   }
 }

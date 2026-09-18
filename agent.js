@@ -176,6 +176,8 @@ async function runSingleSiteCycle(config, options = {}) {
  * 24/7 Watchdog Daemon Loop
  */
 async function runWatchdogDaemon(config, options = {}) {
+  const alertAutomationEnabled = config.alerts?.enabled !== false;
+  const dailyReportAutomationEnabled = config.schedule?.dailyReportEnabled !== false;
   const checkIntervalMins = config.alerts?.checkIntervalMinutes || 3;
   const checkIntervalMs = checkIntervalMins * 60 * 1000;
   const targetHour = config.schedule?.dailyReportHour ?? 8;
@@ -187,8 +189,9 @@ async function runWatchdogDaemon(config, options = {}) {
   console.log(`\n===========================================================`);
   console.log(`🛡️  24/7 ORB WATCHDOG DAEMON STARTED`);
   console.log(`===========================================================`);
+  console.log(`• Alert Automation: ${alertAutomationEnabled ? 'Enabled' : 'Disabled'}`);
   console.log(`• Site Watchdog Polling Interval: Every ${checkIntervalMins} minute(s)`);
-  console.log(`• Daily Executive Report Schedule: ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')} daily`);
+  console.log(`• Daily Executive Report Schedule: ${dailyReportAutomationEnabled ? `${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')} daily` : 'Disabled'}`);
   console.log(`• WhatsApp Alerts: ${config.whatsapp?.enabled ? `Enabled (${config.whatsapp.recipientJid})` : 'Disabled'}`);
   console.log(`===========================================================\n`);
 
@@ -201,13 +204,17 @@ async function runWatchdogDaemon(config, options = {}) {
   process.on('SIGTERM', gracefulShutdown);
 
   // Initial immediate assessment
-  try {
-    console.log(`[Watchdog] Running startup health evaluation across discovered sites...`);
-    const sites = await getAllSitesTelemetry(config);
-    const incidents = await evaluateAlerts(config, sites, options);
-    console.log(`[Watchdog] Startup evaluation complete. ${incidents.length} alert(s) triggered.`);
-  } catch (err) {
-    console.error(`[Watchdog] Startup evaluation error: ${err.message}`);
+  if (alertAutomationEnabled) {
+    try {
+      console.log(`[Watchdog] Running startup health evaluation across discovered sites...`);
+      const sites = await getAllSitesTelemetry(config);
+      const incidents = await evaluateAlerts(config, sites, options);
+      console.log(`[Watchdog] Startup evaluation complete. ${incidents.length} alert(s) triggered.`);
+    } catch (err) {
+      console.error(`[Watchdog] Startup evaluation error: ${err.message}`);
+    }
+  } else {
+    console.log(`[Watchdog] Alert automation is disabled. Monitoring is paused.`);
   }
 
   while (running) {
@@ -218,21 +225,25 @@ async function runWatchdogDaemon(config, options = {}) {
     const currentDateKey = now.toISOString().slice(0, 10);
 
     // 1. Continuous Watchdog Check for Failures & Outages
-    try {
-      console.log(`[Watchdog ${now.toLocaleTimeString()}] Polling discovered sites for status anomalies...`);
-      const sites = await getAllSitesTelemetry(config);
-      const incidents = await evaluateAlerts(config, sites, options);
-      if (incidents.length > 0) {
-        console.log(`[Watchdog] ⚠️ Handled ${incidents.length} incident alert(s).`);
-      } else {
-        console.log(`[Watchdog] All evaluated sites are in expected state.`);
+    if (alertAutomationEnabled) {
+      try {
+        console.log(`[Watchdog ${now.toLocaleTimeString()}] Polling discovered sites for status anomalies...`);
+        const sites = await getAllSitesTelemetry(config);
+        const incidents = await evaluateAlerts(config, sites, options);
+        if (incidents.length > 0) {
+          console.log(`[Watchdog] ⚠️ Handled ${incidents.length} incident alert(s).`);
+        } else {
+          console.log(`[Watchdog] All evaluated sites are in expected state.`);
+        }
+      } catch (pollErr) {
+        console.error(`[Watchdog Poll Error] ${pollErr.message}`);
       }
-    } catch (pollErr) {
-      console.error(`[Watchdog Poll Error] ${pollErr.message}`);
+    } else {
+      console.log(`[Watchdog ${now.toLocaleTimeString()}] Alert automation is disabled; skipping watch checks.`);
     }
 
     // 2. Scheduled Daily Executive Report Trigger
-    if (now.getHours() === targetHour && now.getMinutes() >= targetMinute && lastDailyReportDate !== currentDateKey) {
+    if (dailyReportAutomationEnabled && now.getHours() === targetHour && now.getMinutes() >= targetMinute && lastDailyReportDate !== currentDateKey) {
       console.log(`[Watchdog] Triggering scheduled daily site report cycle...`);
       try {
         await runMultiSiteDailyReport(config, options);

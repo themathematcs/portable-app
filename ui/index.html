@@ -327,7 +327,11 @@
 
       <div class="card">
         <h2>Report schedule</h2>
-        <div class="row">
+        <div class="toggle">
+          <input id="dailyReportEnabled" type="checkbox" checked />
+          <label for="dailyReportEnabled">Daily full report automation ON</label>
+        </div>
+        <div class="row" style="margin-top: 12px;">
           <div class="field">
             <label for="reportHour">Hour</label>
             <input id="reportHour" type="number" min="0" max="23" />
@@ -336,6 +340,10 @@
             <label for="reportMinute">Minute</label>
             <input id="reportMinute" type="number" min="0" max="59" />
           </div>
+        </div>
+        <div class="field">
+          <label for="reportTime">Send time</label>
+          <input id="reportTime" type="time" />
         </div>
         <div class="field">
           <label for="checkInterval">Alert check interval (minutes)</label>
@@ -348,8 +356,15 @@
       </div>
 
       <div class="card">
-        <h2>WhatsApp</h2>
-        <div class="field">
+        <h2>Alert automation</h2>
+        <div class="toggle">
+          <input id="alertEnabled" type="checkbox" checked />
+          <label for="alertEnabled">Auto alerts ON</label>
+        </div>
+        <div class="button-row">
+          <button id="alertToggleBtn" class="secondary" type="button">Toggle alert automation</button>
+        </div>
+        <div class="field" style="margin-top: 16px;">
           <label for="whatsappRecipient">Recipient number or group JID</label>
           <input id="whatsappRecipient" type="text" placeholder="254712345678 or group@..." />
         </div>
@@ -368,7 +383,7 @@
           <input id="whatsappEnabled" type="checkbox" />
           <label for="whatsappEnabled">Enable WhatsApp delivery</label>
         </div>
-        <div class="tiny">The pairing flow stays inside this page instead of opening a separate tab.</div>
+        <div class="tiny">This turns on instant individual site outage alerts when a site drops offline or degrades below threshold.</div>
       </div>
 
       <div class="card">
@@ -393,8 +408,10 @@
       <div class="button-row">
         <button id="saveBtn">Save settings</button>
         <button id="dryRunBtn" class="secondary">WhatsApp test</button>
-        <button id="allSitesReportBtn" class="secondary">Send all-sites report</button>
+        <button id="allSitesReportBtn" class="secondary">Send full report</button>
+        <button id="reportToggleBtn" class="secondary">Full report: ON</button>
         <button id="offlineAlertBtn" class="secondary">Send offline alert</button>
+        <button id="alertToggleBtn" class="secondary">Auto alert: ON</button>
         <button id="dailyScheduleBtn" class="secondary">Run daily schedule</button>
         <button id="pairWaBtn" class="secondary">Pair WhatsApp</button>
       </div>
@@ -505,15 +522,21 @@
         document.getElementById('orbCertificatePath').value = config.orb?.certificatePath || '';
         document.getElementById('orbPrivateKeyPath').value = config.orb?.privateKeyPath || '';
         document.getElementById('summary').value = config.statusNotes?.summary || '';
+        document.getElementById('dailyReportEnabled').checked = config.schedule?.dailyReportEnabled !== false;
         document.getElementById('reportHour').value = config.schedule?.dailyReportHour ?? 8;
         document.getElementById('reportMinute').value = config.schedule?.dailyReportMinute ?? 0;
+        const reportTimeValue = `${String(config.schedule?.dailyReportHour ?? 8).padStart(2, '0')}:${String(config.schedule?.dailyReportMinute ?? 0).padStart(2, '0')}`;
+        document.getElementById('reportTime').value = reportTimeValue;
         document.getElementById('checkInterval').value = config.alerts?.checkIntervalMinutes ?? 3;
         document.getElementById('degradedThreshold').value = config.alerts?.degradedThreshold ?? 75;
+        document.getElementById('alertEnabled').checked = config.alerts?.enabled !== false;
         document.getElementById('whatsappRecipient').value = config.whatsapp?.recipientJid || '';
         document.getElementById('whatsappEnabled').checked = !!config.whatsapp?.enabled;
         document.getElementById('telegramBotToken').value = config.telegram?.botToken || '';
         document.getElementById('telegramChatId').value = config.telegram?.chatId || '';
         document.getElementById('telegramEnabled').checked = !!config.telegram?.enabled;
+        document.getElementById('alertToggleBtn').textContent = `Auto alert: ${document.getElementById('alertEnabled').checked ? 'ON' : 'OFF'}`;
+        document.getElementById('reportToggleBtn').textContent = `Full report: ${document.getElementById('dailyReportEnabled').checked ? 'ON' : 'OFF'}`;
 
         try {
           const orbInfo = await api('/api/orb-status');
@@ -532,6 +555,9 @@
 
     document.getElementById('saveBtn').addEventListener('click', async () => {
       try {
+        const timeValue = document.getElementById('reportTime').value;
+        const [hour, minute] = timeValue ? timeValue.split(':').map(Number) : [Number(document.getElementById('reportHour').value || 8), Number(document.getElementById('reportMinute').value || 0)];
+
         const payload = {
           site: {
             name: document.getElementById('siteName').value.trim(),
@@ -541,10 +567,12 @@
             summary: document.getElementById('summary').value.trim()
           },
           schedule: {
-            dailyReportHour: Number(document.getElementById('reportHour').value || 8),
-            dailyReportMinute: Number(document.getElementById('reportMinute').value || 0)
+            dailyReportEnabled: document.getElementById('dailyReportEnabled').checked,
+            dailyReportHour: Number(hour || 8),
+            dailyReportMinute: Number(minute || 0)
           },
           alerts: {
+            enabled: document.getElementById('alertEnabled').checked,
             checkIntervalMinutes: Number(document.getElementById('checkInterval').value || 3),
             degradedThreshold: Number(document.getElementById('degradedThreshold').value || 75)
           },
@@ -600,13 +628,41 @@
 
     document.getElementById('allSitesReportBtn').addEventListener('click', async () => {
       try {
-        setStatus('Starting all-sites Orb report ...', 'success');
+        setStatus('Starting full Orb report ...', 'success');
         const result = await api('/api/run', 'POST', { action: 'send-all-sites-report' });
-        const text = (result.stdout || '').trim() || 'All-sites report completed successfully.';
+        const text = (result.stdout || '').trim() || 'Full report completed successfully.';
         setStatus(text, 'success');
       } catch (error) {
-        setStatus('All-sites report failed: ' + error.message, 'error');
+        setStatus('Full report failed: ' + error.message, 'error');
       }
+    });
+
+    document.getElementById('reportToggleBtn').addEventListener('click', () => {
+      const checkbox = document.getElementById('dailyReportEnabled');
+      checkbox.checked = !checkbox.checked;
+      document.getElementById('reportToggleBtn').textContent = `Full report: ${checkbox.checked ? 'ON' : 'OFF'}`;
+      setStatus(`Daily full report automation ${checkbox.checked ? 'enabled' : 'disabled'}.`, 'success');
+    });
+
+    document.getElementById('alertToggleBtn').addEventListener('click', () => {
+      const checkbox = document.getElementById('alertEnabled');
+      checkbox.checked = !checkbox.checked;
+      document.getElementById('alertToggleBtn').textContent = `Auto alert: ${checkbox.checked ? 'ON' : 'OFF'}`;
+      setStatus(`Auto alert automation ${checkbox.checked ? 'enabled' : 'disabled'}.`, 'success');
+    });
+
+    document.getElementById('alertEnabled').addEventListener('change', () => {
+      document.getElementById('alertToggleBtn').textContent = `Auto alert: ${document.getElementById('alertEnabled').checked ? 'ON' : 'OFF'}`;
+    });
+
+    document.getElementById('dailyReportEnabled').addEventListener('change', () => {
+      document.getElementById('reportToggleBtn').textContent = `Full report: ${document.getElementById('dailyReportEnabled').checked ? 'ON' : 'OFF'}`;
+    });
+
+    document.getElementById('reportTime').addEventListener('input', () => {
+      const [hour, minute] = document.getElementById('reportTime').value.split(':').map(Number);
+      document.getElementById('reportHour').value = Number.isFinite(hour) ? hour : 8;
+      document.getElementById('reportMinute').value = Number.isFinite(minute) ? minute : 0;
     });
 
     document.getElementById('offlineAlertBtn').addEventListener('click', async () => {
