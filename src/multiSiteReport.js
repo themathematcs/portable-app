@@ -14,7 +14,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { getAllSitesTelemetry } from './orbApi.js';
-import { generateIncidentCard } from './multiSiteVisual.js';
+import { generateIncidentCard, generateMultiSiteCard } from './multiSiteVisual.js';
 import { getCloneScreenshot, resolveCloneId, stopCloneServer } from './orbCloneScreenshot.js';
 import { sendWhatsAppReport } from './whatsapp.js';
 import { sendTelegramReport } from './telegram.js';
@@ -166,18 +166,27 @@ export async function runMultiSiteDailyReport(config, options = {}) {
   console.log(`[Daily Report] Read ${sites.length} local Orb site(s).`);
 
   try {
-const caption = formatSiteCaption(sites[0] || { name: 'Orb Network', status: 'ONLINE', score: 0 }, dateStr, sites, config);
+    const caption = formatSiteCaption(sites[0] || { name: 'Orb Network', status: 'ONLINE', score: 0 }, dateStr, sites, config);
 
     let imagePath = null;
     if (sites.length > 0) {
-      const site = sites[0];
-      const cloneId = resolveCloneId(site.name, site.id);
-      console.log(`[Daily Summary] Clone ID: ${cloneId || '(none — fallback card)'}`);
+      const summaryPath = path.resolve(os.tmpdir(), `orb_multi_site_summary_${Date.now()}.png`);
 
-      if (cloneId) {
-        imagePath = await getCloneScreenshot(cloneId, site.name, site);
-      } else {
-        console.log('[Daily Summary] No clone mapping for summary card; using text-only summary.');
+      try {
+        imagePath = await generateMultiSiteCard(summaryPath, sites, dateStr);
+        console.log(`[Daily Summary] Generated all-sites dashboard image: ${imagePath}`);
+      } catch (summaryError) {
+        console.warn(`[Daily Summary] Multi-site dashboard generation failed: ${summaryError.message}`);
+
+        const site = sites[0];
+        const cloneId = resolveCloneId(site.name, site.id);
+        console.log(`[Daily Summary] Clone ID: ${cloneId || '(none — fallback card)'}`);
+
+        if (cloneId) {
+          imagePath = await getCloneScreenshot(cloneId, site.name, site);
+        } else {
+          console.log('[Daily Summary] No clone mapping for summary card; using text-only summary.');
+        }
       }
     }
 
