@@ -83,7 +83,7 @@
     }
     .neon-name::before,
     .neon-name::after {
-      content: "Chriz";
+      content: "";
       position: absolute;
       inset: 0;
       z-index: -1;
@@ -91,8 +91,8 @@
       opacity: 0.45;
       pointer-events: none;
     }
-    .neon-name::before { color: rgba(121, 215, 255, 0.45); }
-    .neon-name::after { color: rgba(154, 132, 255, 0.35); transform: translate(0, 2px); }
+    .neon-name::before { background: rgba(121, 215, 255, 0.18); border-radius: 12px; }
+    .neon-name::after { background: rgba(154, 132, 255, 0.12); border-radius: 12px; transform: translate(0, 2px); }
     @keyframes pulse {
       from { text-shadow: 0 0 6px rgba(121, 215, 255, 0.5), 0 0 12px rgba(154, 132, 255, 0.5); }
       to { text-shadow: 0 0 12px rgba(121, 215, 255, 0.8), 0 0 18px rgba(154, 132, 255, 0.7); }
@@ -278,7 +278,7 @@
 <body>
   <div class="wrap">
     <div class="header">
-      <h1><span class="neon-name">Chriz</span></h1>
+      <h1><span class="neon-name" id="brandName">Orb Report Setup</span></h1>
       <p>Orb Report Setup • live monitoring dashboard with secure config, WhatsApp alerts, and daily network summaries.</p>
     </div>
 
@@ -491,9 +491,13 @@
         const config = await api('/api/config');
         const siteNameEl = document.getElementById('siteName');
         const siteIspEl = document.getElementById('siteIsp');
+        const brandNameEl = document.getElementById('brandName');
 
+        const siteName = config.site?.name || 'Orb Report Setup';
         siteNameEl.value = config.site?.name || '';
         siteIspEl.value = config.site?.isp || '';
+        brandNameEl.textContent = siteName;
+        document.title = siteName;
         document.getElementById('orbConfigDir').value = config.orb?.configDir || '';
         document.getElementById('orbApiUrl').value = config.orb?.apiUrl || 'https://panel.orb.net';
         document.getElementById('orbCertificatePath').value = config.orb?.certificatePath || '';
