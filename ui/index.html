@@ -393,7 +393,9 @@
       <div class="button-row">
         <button id="saveBtn">Save settings</button>
         <button id="dryRunBtn" class="secondary">WhatsApp test</button>
-        <button id="reportBtn" class="secondary">Send full report</button>
+        <button id="allSitesReportBtn" class="secondary">Send all-sites report</button>
+        <button id="offlineAlertBtn" class="secondary">Send offline alert</button>
+        <button id="dailyScheduleBtn" class="secondary">Run daily schedule</button>
         <button id="pairWaBtn" class="secondary">Pair WhatsApp</button>
       </div>
       <div id="pairPanel" class="pair-panel">
@@ -596,14 +598,36 @@
       }
     });
 
-    document.getElementById('reportBtn').addEventListener('click', async () => {
+    document.getElementById('allSitesReportBtn').addEventListener('click', async () => {
       try {
-        setStatus('Starting full Orb report with screenshot and metrics...', 'success');
-        const result = await api('/api/run', 'POST', { action: 'send-report' });
-        const text = (result.stdout || '').trim() || 'Full Orb report completed successfully.';
+        setStatus('Starting all-sites Orb report ...', 'success');
+        const result = await api('/api/run', 'POST', { action: 'send-all-sites-report' });
+        const text = (result.stdout || '').trim() || 'All-sites report completed successfully.';
         setStatus(text, 'success');
       } catch (error) {
-        setStatus('Full report failed: ' + error.message, 'error');
+        setStatus('All-sites report failed: ' + error.message, 'error');
+      }
+    });
+
+    document.getElementById('offlineAlertBtn').addEventListener('click', async () => {
+      try {
+        setStatus('Dispatching offline site alert...', 'success');
+        const result = await api('/api/run', 'POST', { action: 'send-offline-alert' });
+        const text = (result.stdout || '').trim() || 'Offline alert sent successfully.';
+        setStatus(text, 'success');
+      } catch (error) {
+        setStatus('Offline alert failed: ' + error.message, 'error');
+      }
+    });
+
+    document.getElementById('dailyScheduleBtn').addEventListener('click', async () => {
+      try {
+        setStatus('Running the daily report schedule...', 'success');
+        const result = await api('/api/run', 'POST', { action: 'run-daily-schedule' });
+        const text = (result.stdout || '').trim() || 'Daily schedule run completed successfully.';
+        setStatus(text, 'success');
+      } catch (error) {
+        setStatus('Daily schedule failed: ' + error.message, 'error');
       }
     });
 

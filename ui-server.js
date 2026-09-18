@@ -198,7 +198,12 @@ async function handleAction(action) {
       return runCommand('node', ['agent.js', '--test-whatsapp'], 'WhatsApp connectivity test');
     case 'daily':
     case 'send-report':
-      return runCommand('node', ['agent.js', '--daily'], 'full Orb report');
+    case 'send-all-sites-report':
+      return runCommand('node', ['agent.js', '--daily'], 'all-sites Orb report');
+    case 'run-daily-schedule':
+      return runCommand('node', ['agent.js', '--daily'], 'daily schedule run');
+    case 'send-offline-alert':
+      return runCommand('node', ['agent.js', '--test-alert'], 'offline site alert');
     case 'test-whatsapp':
       return runCommand('node', ['agent.js', '--test-whatsapp'], 'WhatsApp connectivity test');
     case 'pair-whatsapp':

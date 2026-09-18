@@ -170,22 +170,32 @@ export async function runMultiSiteDailyReport(config, options = {}) {
 
     let imagePath = null;
     if (sites.length > 0) {
-      const summaryPath = path.resolve(os.tmpdir(), `orb_multi_site_summary_${Date.now()}.png`);
+      const site = sites[0];
+      const cloneId = resolveCloneId(site.name, site.id);
+      console.log(`[Daily Summary] Selected report site: ${site.name || site.id || 'unknown'} | Clone ID: ${cloneId || '(none — fallback card)'}`);
 
-      try {
-        imagePath = await generateMultiSiteCard(summaryPath, sites, dateStr);
-        console.log(`[Daily Summary] Generated all-sites dashboard image: ${imagePath}`);
-      } catch (summaryError) {
-        console.warn(`[Daily Summary] Multi-site dashboard generation failed: ${summaryError.message}`);
-
-        const site = sites[0];
-        const cloneId = resolveCloneId(site.name, site.id);
-        console.log(`[Daily Summary] Clone ID: ${cloneId || '(none — fallback card)'}`);
-
-        if (cloneId) {
+      if (cloneId) {
+        try {
           imagePath = await getCloneScreenshot(cloneId, site.name, site);
-        } else {
-          console.log('[Daily Summary] No clone mapping for summary card; using text-only summary.');
+          console.log(`[Daily Summary] Using real Orb interface screenshot: ${imagePath}`);
+        } catch (cloneError) {
+          console.warn(`[Daily Summary] Clone screenshot failed: ${cloneError.message}. Falling back to generated dashboard.`);
+
+          const summaryPath = path.resolve(os.tmpdir(), `orb_multi_site_summary_${Date.now()}.png`);
+          try {
+            imagePath = await generateMultiSiteCard(summaryPath, sites, dateStr);
+            console.log(`[Daily Summary] Generated fallback dashboard image: ${imagePath}`);
+          } catch (summaryError) {
+            console.warn(`[Daily Summary] Multi-site dashboard generation failed: ${summaryError.message}`);
+          }
+        }
+      } else {
+        const summaryPath = path.resolve(os.tmpdir(), `orb_multi_site_summary_${Date.now()}.png`);
+        try {
+          imagePath = await generateMultiSiteCard(summaryPath, sites, dateStr);
+          console.log(`[Daily Summary] No clone mapping; generated fallback dashboard image: ${imagePath}`);
+        } catch (summaryError) {
+          console.warn(`[Daily Summary] Multi-site dashboard generation failed: ${summaryError.message}`);
         }
       }
     }
