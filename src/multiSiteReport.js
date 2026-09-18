@@ -19,6 +19,7 @@ import { getCloneScreenshot, resolveCloneId, stopCloneServer } from './orbCloneS
 import { sendWhatsAppReport } from './whatsapp.js';
 import { sendTelegramReport } from './telegram.js';
 import { formatDate } from './formatter.js';
+import { formatSiteMessage } from './messageTemplate.js';
 
 const INTER_SITE_DELAY_MS = 2000;
 let reportInProgress = false;
@@ -31,7 +32,8 @@ let reportInProgress = false;
  * @param {Array<object>} [sites=[site]] Current local Orb site data.
  * @returns {string}
  */
-export function formatSiteCaption(site, dateStr, sites = [site]) {
+export function formatSiteCaption(site, dateStr, sites = [site], config = {}) {
+  const reporting = config.reporting || {};
   const total = sites.length;
   const online = sites.filter((item) => item.status === 'ONLINE').length;
   const degraded = sites.filter((item) => item.status === 'DEGRADED').length;
@@ -39,6 +41,21 @@ export function formatSiteCaption(site, dateStr, sites = [site]) {
   const averageScore = total > 0
     ? Math.round(sites.reduce((sum, item) => sum + (item.score || 0), 0) / total)
     : 0;
+
+  if (sites.length === 1 && site && site.name) {
+    return formatSiteMessage({
+      ...site,
+      date: dateStr,
+      status: site.status || 'ONLINE',
+      score: site.score ?? 0,
+      isp: site.isp || 'Unknown',
+      connection: site.connection || '',
+      location: site.location || site.connection || 'N/A',
+      uptime: site.uptime || 'N/A',
+      latencyMs: site.latencyMs ?? site.latency ?? 'N/A',
+      packetLossPct: site.packetLossPct ?? 'N/A',
+    }, { reporting });
+  }
 
   const lines = [
     `🌐 *ORB NETWORK OBSERVABILITY - SITE STATUS REPORT*`,
@@ -54,7 +71,7 @@ export function formatSiteCaption(site, dateStr, sites = [site]) {
   ];
 
   for (const item of sites) {
-    const statusIcon = item.status === 'ONLINE' ? '🟢' : item.status === 'DEGRADED' ? '🟡' : '🔴';
+    const statusIcon = item.status === 'ONLINE' ? (reporting.statusEmoji?.ONLINE || '🟢') : item.status === 'DEGRADED' ? (reporting.statusEmoji?.DEGRADED || '🟡') : (reporting.statusEmoji?.OFFLINE || '🔴');
     lines.push(`${statusIcon} *${item.name}*`);
     lines.push(`   └ Score: ${item.score} | ISP: ${item.isp}${item.connection ? ` (${item.connection})` : ''} | ${item.status}`);
   }
@@ -142,63 +159,43 @@ export async function runMultiSiteDailyReport(config, options = {}) {
   reportInProgress = true;
 
   console.log(`\n=================================================`);
-  console.log(`[Daily Report] Starting Per-Site Reporting Cycle`);
+  console.log(`[Daily Report] Starting All-Sites Summary Cycle`);
   console.log(`=================================================`);
 
-  // 1. Read the local Orb summary
   const sites = await getAllSitesTelemetry(config);
   console.log(`[Daily Report] Read ${sites.length} local Orb site(s).`);
 
   try {
-    // 2. Per-site loop
-    for (let i = 0; i < sites.length; i++) {
-      const site = sites[i];
-      console.log(`\n[Site ${i + 1}/${sites.length}] Processing: ${site.name}`);
-      console.log('[Queue] One device active: capture -> send -> cleanup.');
+const caption = formatSiteCaption(sites[0] || { name: 'Orb Network', status: 'ONLINE', score: 0 }, dateStr, sites, config);
 
-      // Resolve to clone app ID
+    let imagePath = null;
+    if (sites.length > 0) {
+      const site = sites[0];
       const cloneId = resolveCloneId(site.name, site.id);
-      console.log(`[Site] Clone ID: ${cloneId || '(none — real Orb interface missing)'}`);
+      console.log(`[Daily Summary] Clone ID: ${cloneId || '(none — fallback card)'}`);
 
-      let imagePath = null;
-      if (!cloneId) {
-        throw new Error(`No Orb clone mapping exists for site "${site.name}". Please map the site to the real Orb interface entry.`);
-      }
-
-      try {
+      if (cloneId) {
         imagePath = await getCloneScreenshot(cloneId, site.name, site);
-      } catch (err) {
-        console.error(`[Site] Clone screenshot failed for ${site.name}: ${err.message}`);
-        throw new Error(`The actual Orb interface workflow failed for ${site.name}. Please make sure the Orb clone app is installed and running.`);
-      }
-
-      // Format per-site caption
-      const caption = formatSiteCaption(site, dateStr, [site]);
-
-      // Dispatch
-      await dispatch(config, { imagePath, caption, dryRun });
-
-      if (imagePath && fs.existsSync(imagePath)) {
-        try {
-          fs.unlinkSync(imagePath);
-          console.log(`[Queue] Released screenshot for ${site.name}.`);
-        } catch (error) {
-          console.warn(`[Queue] Could not release screenshot for ${site.name}: ${error.message}`);
-        }
-      }
-
-      // Rate-limit delay between sites
-      if (i < sites.length - 1) {
-        console.log(`[Site] Waiting ${INTER_SITE_DELAY_MS}ms before next site...`);
-        await new Promise((r) => setTimeout(r, INTER_SITE_DELAY_MS));
+      } else {
+        console.log('[Daily Summary] No clone mapping for summary card; using text-only summary.');
       }
     }
 
-    console.log(`\n[Daily Report] Cycle complete. ${sites.length} site report(s) sent.`);
+    await dispatch(config, { imagePath, caption, dryRun });
+
+    if (imagePath && fs.existsSync(imagePath)) {
+      try {
+        fs.unlinkSync(imagePath);
+        console.log('[Daily Summary] Released summary screenshot.');
+      } catch (error) {
+        console.warn(`[Daily Summary] Could not release summary screenshot: ${error.message}`);
+      }
+    }
+
+    console.log(`\n[Daily Report] Summary cycle complete. 1 all-sites report sent.`);
     return { success: true, sites };
 
   } finally {
-    // Stop the clone dev server if we started it
     stopCloneServer();
     reportInProgress = false;
   }

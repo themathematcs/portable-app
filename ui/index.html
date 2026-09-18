@@ -6,70 +6,140 @@
   <title>Orb Report Setup</title>
   <style>
     :root {
-      --bg: #f4f7fb;
-      --panel: #ffffff;
-      --ink: #1f2a37;
-      --muted: #5f6f85;
-      --line: #dfe7f1;
-      --primary: #0f7ae5;
-      --primary-dark: #0b5db1;
-      --success: #0d8a4d;
-      --danger: #c5392d;
-      --shadow: 0 12px 30px rgba(14, 39, 80, 0.08);
+      --bg: #0c1018;
+      --bg-2: #141b2a;
+      --panel: rgba(18, 22, 33, 0.96);
+      --panel-strong: rgba(21, 26, 39, 0.98);
+      --ink: #edf2ff;
+      --muted: #a9b3cf;
+      --line: rgba(118, 133, 167, 0.42);
+      --primary: #79d7ff;
+      --primary-2: #9a84ff;
+      --success: #79e2a7;
+      --danger: #ff7b8d;
+      --shadow: 0 10px 24px rgba(6, 10, 18, 0.38);
     }
     * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: var(--bg);
+      background:
+        radial-gradient(circle at top left, rgba(154, 132, 255, 0.08), transparent 30%),
+        radial-gradient(circle at top right, rgba(121, 215, 255, 0.08), transparent 24%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
       color: var(--ink);
+      min-height: 100vh;
     }
     .wrap {
-      max-width: 980px;
+      max-width: 1100px;
       margin: 32px auto;
-      padding: 0 20px 50px;
+      padding: 0 20px 40px;
     }
     .header {
-      background: linear-gradient(135deg, #0f7ae5, #0a5bbd);
+      background: linear-gradient(135deg, rgba(17, 20, 30, 0.96), rgba(24, 26, 37, 0.92));
+      border: 1px solid rgba(122, 138, 177, 0.34);
       color: white;
-      border-radius: 18px;
-      padding: 26px 28px;
+      border-radius: 22px;
+      padding: 28px 30px 22px;
       box-shadow: var(--shadow);
       margin-bottom: 24px;
+      position: relative;
+      overflow: hidden;
     }
-    h1 { margin: 0 0 8px; font-size: clamp(1.8rem, 2vw, 2.6rem); }
-    .header p { margin: 0; opacity: 0.92; }
+    .header::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 18% 0%, rgba(121, 215, 255, 0.08), transparent 28%), radial-gradient(circle at 90% 10%, rgba(154, 132, 255, 0.08), transparent 28%);
+      pointer-events: none;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(2rem, 3vw, 3.2rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      position: relative;
+      z-index: 1;
+    }
+    .header p {
+      margin: 0;
+      opacity: 0.86;
+      position: relative;
+      z-index: 1;
+      color: var(--muted);
+    }
+    .neon-name {
+      display: inline-block;
+      padding: 4px 10px 6px;
+      border-radius: 12px;
+      color: #f2f7ff;
+      text-shadow:
+        0 0 6px rgba(121, 215, 255, 0.7),
+        0 0 16px rgba(154, 132, 255, 0.55);
+      background: rgba(255,255,255,0.02);
+      box-shadow: inset 0 0 18px rgba(121, 215, 255, 0.04), 0 0 14px rgba(154, 132, 255, 0.08);
+      position: relative;
+      animation: pulse 3.5s ease-in-out infinite alternate;
+    }
+    .neon-name::before,
+    .neon-name::after {
+      content: "Chriz";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      filter: blur(10px);
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .neon-name::before { color: rgba(121, 215, 255, 0.45); }
+    .neon-name::after { color: rgba(154, 132, 255, 0.35); transform: translate(0, 2px); }
+    @keyframes pulse {
+      from { text-shadow: 0 0 6px rgba(121, 215, 255, 0.5), 0 0 12px rgba(154, 132, 255, 0.5); }
+      to { text-shadow: 0 0 12px rgba(121, 215, 255, 0.8), 0 0 18px rgba(154, 132, 255, 0.7); }
+    }
     .grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
       gap: 20px;
     }
     .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      box-shadow: var(--shadow);
+      background: linear-gradient(180deg, rgba(18, 22, 31, 0.96), rgba(12, 16, 24, 0.96));
+      border: 1px solid rgba(121, 132, 163, 0.26);
+      border-radius: 18px;
+      box-shadow: 0 8px 22px rgba(6, 10, 18, 0.22);
       padding: 20px;
     }
     .card h2 {
       margin: 0 0 14px;
-      font-size: 1.2rem;
+      font-size: 1.08rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
     }
     .field { margin-bottom: 12px; }
     label {
       display: block;
-      font-size: 0.87rem;
+      font-size: 0.8rem;
       color: var(--muted);
       margin-bottom: 6px;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
     }
     input, select {
       width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--line);
+      padding: 11px 12px;
+      border: 1px solid rgba(127, 103, 195, 0.8);
       border-radius: 10px;
       font-size: 0.96rem;
-      background: white;
+      background: rgba(8, 7, 20, 0.9);
+      color: var(--ink);
+      box-shadow: inset 0 0 12px rgba(42, 224, 255, 0.04);
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: rgba(121, 215, 255, 0.58);
+      box-shadow: 0 0 0 2px rgba(121, 215, 255, 0.08);
     }
     .row {
       display: grid;
@@ -82,32 +152,39 @@
       gap: 10px;
       margin-top: 8px;
       font-weight: 600;
+      color: var(--ink);
     }
     .toggle input {
       width: 18px;
       height: 18px;
+      accent-color: var(--primary);
     }
     button {
-      border: none;
-      background: var(--primary);
-      color: white;
+      border: 1px solid rgba(121, 215, 255, 0.32);
+      background: linear-gradient(135deg, rgba(121, 215, 255, 0.08), rgba(154, 132, 255, 0.1));
+      color: var(--ink);
       padding: 12px 16px;
-      border-radius: 10px;
+      border-radius: 12px;
       cursor: pointer;
       font-size: 0.98rem;
-      font-weight: 700;
-      transition: 0.2s ease;
+      font-weight: 800;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+      box-shadow: none;
     }
-    button:hover { background: var(--primary-dark); }
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(121, 215, 255, 0.48);
+      box-shadow: 0 6px 18px rgba(9, 13, 20, 0.24);
+    }
     .secondary {
-      background: #edf4ff;
-      color: var(--primary-dark);
+      background: rgba(255,255,255,0.02);
+      border-color: rgba(141, 105, 255, 0.7);
+      color: var(--ink);
     }
-    .secondary:hover { background: #dfeeff; }
     .danger {
-      background: var(--danger);
+      background: rgba(255, 90, 117, 0.12);
+      border-color: rgba(255, 90, 117, 0.7);
     }
-    .danger:hover { background: #a82a22; }
     .button-row {
       display: flex;
       gap: 10px;
@@ -116,23 +193,24 @@
     }
     .status {
       margin-top: 18px;
-      background: #f3f8ff;
-      border: 1px solid #d9e9ff;
-      color: #214a7b;
-      border-radius: 10px;
+      background: rgba(42, 224, 255, 0.08);
+      border: 1px solid rgba(42, 224, 255, 0.35);
+      color: #dffcff;
+      border-radius: 12px;
       padding: 12px 14px;
       min-height: 48px;
       display: none;
+      box-shadow: inset 0 0 16px rgba(42, 224, 255, 0.06);
     }
     .status.error {
-      background: #fff1f1;
-      border-color: #ffd6d2;
-      color: #8a2d25;
+      background: rgba(255, 90, 117, 0.08);
+      border-color: rgba(255, 90, 117, 0.4);
+      color: #ffd5dc;
     }
     .status.success {
-      background: #eefcf4;
-      border-color: #cfeedd;
-      color: #1d6f43;
+      background: rgba(97, 247, 178, 0.07);
+      border-color: rgba(97, 247, 178, 0.38);
+      color: #cffef0;
     }
     .status.visible { display: block; }
     .tiny {
@@ -147,38 +225,40 @@
       border-radius: 10px;
       border: 1px solid var(--line);
       font-size: 0.82rem;
-      background: #f8fbff;
+      background: rgba(255,255,255,0.02);
       color: var(--ink);
       line-height: 1.5;
       display: none;
     }
     .setting-status.visible { display: block; }
     .setting-status.ok {
-      background: #eefcf4;
-      border-color: #cfeedd;
-      color: #1d6f43;
+      background: rgba(97, 247, 178, 0.07);
+      border-color: rgba(97, 247, 178, 0.38);
+      color: #dffef5;
     }
     .setting-status.error {
-      background: #fff1f1;
-      border-color: #ffd6d2;
-      color: #8a2d25;
+      background: rgba(255, 90, 117, 0.08);
+      border-color: rgba(255, 90, 117, 0.35);
+      color: #ffd5dc;
     }
     .pair-panel {
       margin-top: 18px;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(130, 100, 210, 0.8);
       border-radius: 12px;
-      background: #f9fbff;
+      background: rgba(255,255,255,0.02);
       padding: 16px;
       display: none;
+      box-shadow: inset 0 0 18px rgba(42, 224, 255, 0.04);
     }
     .pair-panel.visible { display: block; }
     .pair-panel img {
       max-width: 280px;
       width: 100%;
       border-radius: 12px;
-      border: 1px solid var(--line);
+      border: 1px solid rgba(42, 224, 255, 0.5);
       background: white;
       margin-top: 12px;
+      box-shadow: 0 0 20px rgba(42, 224, 255, 0.12);
     }
     .pair-code {
       font-size: 2rem;
@@ -186,19 +266,20 @@
       letter-spacing: 0.35rem;
       text-align: center;
       margin: 16px 0;
-      color: var(--primary-dark);
-      background: white;
-      border: 1px dashed var(--primary);
+      color: var(--primary);
+      background: rgba(8, 7, 20, 0.8);
+      border: 1px dashed rgba(121, 215, 255, 0.36);
       border-radius: 10px;
       padding: 14px 8px;
+      text-shadow: 0 0 8px rgba(121, 215, 255, 0.5);
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="header">
-      <h1>Orb Report Setup</h1>
-      <p>Fill in the fields below and save. This writes the app configuration automatically.</p>
+      <h1><span class="neon-name">Chriz</span></h1>
+      <p>Orb Report Setup • live monitoring dashboard with secure config, WhatsApp alerts, and daily network summaries.</p>
     </div>
 
     <div class="grid">

@@ -44,7 +44,10 @@ function saveAlertState(state) {
 /**
  * Formats the incident alert text message for WhatsApp/Telegram.
  */
-function formatAlertMessage(incident) {
+function formatAlertMessage(incident, config = {}) {
+  const reporting = config.reporting || {};
+  const statusEmoji = reporting.statusEmoji || { ONLINE: '🟢', DEGRADED: '🟡', OFFLINE: '🔴' };
+
   if (incident.type === 'RECOVERY') {
     return [
       `✅ *INCIDENT RESOLVED – SITE RESTORED*`,
@@ -53,25 +56,26 @@ function formatAlertMessage(incident) {
       `📊 *Orb Score:* ${incident.score}/100 (Online)`,
       `⏱️ *Time:* ${incident.timestamp}`,
       ``,
-      `🟢 Network connectivity and metrics returned to normal operational limits.`
+      `${statusEmoji.ONLINE || '🟢'} Network connectivity and metrics returned to normal operational limits.`
     ].join('\n');
   }
 
   const icon = incident.severity === 'CRITICAL' ? '🚨' : '⚠️';
   const title = incident.severity === 'CRITICAL' ? 'CRITICAL NETWORK OUTAGE' : 'PERFORMANCE DEGRADATION';
+  const statusIcon = incident.status === 'OFFLINE' ? (statusEmoji.OFFLINE || '🔴') : (statusEmoji.DEGRADED || '🟡');
 
   return [
     `${icon} *${title}*`,
     `📍 *Site:* ${incident.siteName}`,
     `🌐 *ISP:* ${incident.isp} (${incident.connection})`,
-    `📉 *Status:* ${incident.status}`,
+    `📉 *Status:* ${statusIcon} ${incident.status}`,
     `📊 *Orb Score:* ${incident.score}/100`,
     `⚡ *Latency:* ${incident.latencyMs}ms | *Packet Loss:* ${incident.packetLossPct}%`,
     `⏱️ *Detected:* ${incident.timestamp}`,
     ``,
     incident.severity === 'CRITICAL'
-      ? `🔴 Site is unreachable or completely offline. Immediate attention recommended.`
-      : `🟡 Site performance degraded below threshold. Monitoring for recovery.`
+      ? `${statusEmoji.OFFLINE || '🔴'} Site is unreachable or completely offline. Immediate attention recommended.`
+      : `${statusEmoji.DEGRADED || '🟡'} Site performance degraded below threshold. Monitoring for recovery.`
   ].join('\n');
 }
 
@@ -79,7 +83,7 @@ function formatAlertMessage(incident) {
  * Dispatches an incident alert (with incident card image) to enabled channels.
  */
 async function dispatchAlert(config, incident) {
-  const alertText = formatAlertMessage(incident);
+  const alertText = formatAlertMessage(incident, config);
   const tempCardPath = path.resolve(`./alert_${incident.siteId}_${Date.now()}.png`);
 
   console.log(`\n[Alert Watchdog] 🚨 DISPATCHING ALERT for ${incident.siteName} (${incident.severity})...`);

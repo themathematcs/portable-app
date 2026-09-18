@@ -4,8 +4,9 @@ import path from 'node:path';
 import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { getLocalOrbTelemetry } from './src/orbLocal.js';
-import { discoverOrbExecutable, ensureOrbRunning } from './src/orbGuardian.js';
+import { createRequire } from 'node:module';
+import { ensureOrbRunning, discoverOrbExecutable } from './src/orbGuardian.js';
+import { getLocalOrbTelemetry, findOrbCertificateConfig } from './src/orbLocal.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -13,6 +14,14 @@ const rootDir = __dirname;
 const uiDir = path.join(rootDir, 'ui');
 const configPath = path.join(rootDir, 'config.json');
 const exampleConfigPath = path.join(rootDir, 'config.json.example');
+const envPath = path.join(rootDir, '.env');
+
+// Load .env secrets
+try {
+  const require = createRequire(import.meta.url);
+  const dotenv = require('dotenv');
+  dotenv.config({ path: envPath });
+} catch { /* dotenv not installed */ }
 
 function getFreePort(startPort = 4173, maxAttempts = 25) {
   return new Promise((resolve, reject) => {
@@ -54,10 +63,50 @@ function readJsonFile(filePath) {
 }
 
 function sendJson(res, statusCode, payload) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify(payload));
+  const body = JSON.stringify(payload);
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store'
+  });
+  res.end(body);
 }
 
+// ─── .env helpers ─────────────────────────────────────────────────────────────
+function readEnv() {
+  const vars = {};
+  try {
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq === -1) continue;
+      const key = trimmed.slice(0, eq).trim();
+      const val = trimmed.slice(eq + 1).trim().replace(/^["']|["']$/g, '');
+      vars[key] = val;
+    }
+  } catch { /* no .env file */ }
+  return vars;
+}
+
+function writeEnv(updates) {
+  let content = '';
+  try { content = fs.readFileSync(envPath, 'utf8'); } catch { content = ''; }
+  for (const [key, value] of Object.entries(updates)) {
+    const regex = new RegExp(`^(${key}\\s*=.*)$`, 'm');
+    const line = `${key}=${value}`;
+    if (regex.test(content)) {
+      content = content.replace(regex, line);
+    } else {
+      content = content.trimEnd() + '\n' + line + '\n';
+    }
+  }
+  fs.writeFileSync(envPath, content, 'utf8');
+  // Also update process.env so token-status works immediately
+  for (const [k, v] of Object.entries(updates)) process.env[k] = v;
+}
+
+// ─── saveConfig ───────────────────────────────────────────────────────────────
 async function saveConfig(request, res) {
   try {
     const raw = await new Promise((resolve, reject) => {
@@ -80,9 +129,11 @@ async function saveConfig(request, res) {
       orb: { ...existing.orb, ...payload.orb },
       agent: { ...existing.agent, ...payload.agent },
       alerts: { ...existing.alerts, ...payload.alerts },
-      schedule: { ...existing.schedule, ...payload.schedule }
+      schedule: { ...existing.schedule, ...payload.schedule },
+      reporting: { ...existing.reporting, ...payload.reporting }
     };
 
+    // API token always lives in .env, never in config.json
     if (merged.orb) delete merged.orb.apiToken;
 
     fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf8');
@@ -91,6 +142,7 @@ async function saveConfig(request, res) {
     sendJson(res, 400, { ok: false, message: error.message || 'Invalid settings payload.' });
   }
 }
+
 
 function runCommand(command, args, label = 'command') {
   return new Promise((resolve, reject) => {
@@ -264,6 +316,60 @@ async function startPairingProcess(method = 'qr', phoneNumber = '') {
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://localhost:${port}`);
+
+  if (req.method === 'GET' && url.pathname === '/api/env') {
+    sendJson(res, 200, readEnv());
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/env') {
+    (async () => {
+      try {
+        const raw = await new Promise((resolve, reject) => {
+          let body = '';
+          req.on('data', chunk => { body += chunk; if (body.length > 1_000_000) { reject(new Error('Payload too large')); req.destroy(); } });
+          req.on('end', () => resolve(body));
+          req.on('error', reject);
+        });
+        const payload = JSON.parse(raw || '{}');
+        if (!payload || typeof payload !== 'object') throw new Error('Invalid env payload.');
+        writeEnv(payload);
+        sendJson(res, 200, { ok: true, message: 'Environment values updated successfully.' });
+      } catch (error) {
+        sendJson(res, 400, { ok: false, message: error.message || 'Invalid env payload.' });
+      }
+    })();
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/token-status') {
+    (async () => {
+      try {
+        const token = readEnv().ORB_API_TOKEN || '';
+        if (!token) {
+          sendJson(res, 200, { valid: false, sitesDetected: 0, message: 'No Orb API token has been saved in the .env file.' });
+          return;
+        }
+
+        const response = await fetch('https://panel.orb.net/api/v2/organizations', {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          sendJson(res, 200, { valid: false, sitesDetected: 0, message: `Token rejected by Orb API: ${response.status} ${response.statusText}` });
+          return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        const sitesDetected = Array.isArray(data) ? data.length : Array.isArray(data.organizations) ? data.organizations.length : 0;
+        sendJson(res, 200, { valid: true, sitesDetected, message: `Orb token is valid. ${sitesDetected} organization(s) detected.` });
+      } catch (error) {
+        sendJson(res, 200, { valid: false, sitesDetected: 0, message: error.message || 'Unable to validate Orb token.' });
+      }
+    })();
+    return;
+  }
 
   if (req.method === 'GET' && url.pathname === '/api/config') {
     ensureConfigFile();

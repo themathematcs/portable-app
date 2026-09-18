@@ -1,18 +1,44 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_CONFIG_PATH = path.resolve(__dirname, '../config.json');
+const ENV_PATH = path.resolve(__dirname, '../.env');
 
-/**
- * Loads configuration from disk and validates runtime parameters.
- * Supports environment variable overrides for sensitive credentials.
- * 
- * @param {string} [configPath] Custom path to config.json
- * @returns {object} Loaded and sanitized configuration
- */
+try {
+  const require = createRequire(import.meta.url);
+  const dotenv = require('dotenv');
+  dotenv.config({ path: ENV_PATH });
+} catch {
+  // dotenv not installed or .env missing
+}
+
+const DEFAULT_REPORTING = {
+  statusEmoji: {
+    ONLINE: '🟢',
+    DEGRADED: '🟡',
+    OFFLINE: '🔴'
+  },
+  scoreEmoji: '📊',
+  ispEmoji: '🌐',
+  locationEmoji: '📍',
+  uptimeEmoji: '⏱',
+  speedEmoji: '↓',
+  sections: {
+    scoreBreakdown: true,
+    latency: true,
+    speed: true,
+    location: true,
+    uptime: true,
+    footer: true
+  },
+  sectionOrder: ['header', 'score', 'isp', 'location', 'uptime', 'speed', 'footer'],
+  footerText: '🤖 Orb Network Monitor | 24/7 Watchdog Active'
+};
+
 export function loadConfig(configPath) {
   const resolvedPath = path.resolve(configPath || DEFAULT_CONFIG_PATH);
 
@@ -30,7 +56,6 @@ export function loadConfig(configPath) {
     throw new Error(`Failed to parse config file at ${resolvedPath}: ${err.message}`);
   }
 
-  // Merge with environment variables if available
   const config = {
     site: {
       name: process.env.SITE_NAME || rawConfig.site?.name || 'Remote Site',
@@ -46,8 +71,8 @@ export function loadConfig(configPath) {
       notes: rawConfig.statusNotes?.notes || 'No issues detected; all devices operational'
     },
     telegram: {
-      enabled: process.env.TELEGRAM_ENABLED !== undefined 
-        ? process.env.TELEGRAM_ENABLED === 'true' 
+      enabled: process.env.TELEGRAM_ENABLED !== undefined
+        ? process.env.TELEGRAM_ENABLED === 'true'
         : Boolean(rawConfig.telegram?.enabled),
       botToken: process.env.TELEGRAM_BOT_TOKEN || rawConfig.telegram?.botToken || '',
       chatId: process.env.TELEGRAM_CHAT_ID || rawConfig.telegram?.chatId || '',
@@ -55,8 +80,8 @@ export function loadConfig(configPath) {
       maxRetries: Number(rawConfig.telegram?.maxRetries) || 3
     },
     whatsapp: {
-      enabled: process.env.WHATSAPP_ENABLED !== undefined 
-        ? process.env.WHATSAPP_ENABLED === 'true' 
+      enabled: process.env.WHATSAPP_ENABLED !== undefined
+        ? process.env.WHATSAPP_ENABLED === 'true'
         : Boolean(rawConfig.whatsapp?.enabled),
       recipientJid: process.env.WHATSAPP_RECIPIENT_JID || rawConfig.whatsapp?.recipientJid || '',
       authFolder: rawConfig.whatsapp?.authFolder || './auth_info',
@@ -65,7 +90,7 @@ export function loadConfig(configPath) {
     },
     agent: {
       reportScheduleCron: rawConfig.agent?.reportScheduleCron || '0 8 * * *',
-      tempImagePath: rawConfig.agent?.tempImagePath 
+      tempImagePath: rawConfig.agent?.tempImagePath
         ? path.resolve(__dirname, '..', rawConfig.agent.tempImagePath)
         : path.resolve(__dirname, '../report_img.png'),
       cleanUpOnFailure: rawConfig.agent?.cleanUpOnFailure !== false
@@ -87,18 +112,24 @@ export function loadConfig(configPath) {
       dailyReportHour: 8,
       dailyReportMinute: 0
     },
+    reporting: {
+      ...DEFAULT_REPORTING,
+      ...(rawConfig.reporting || {}),
+      statusEmoji: {
+        ...DEFAULT_REPORTING.statusEmoji,
+        ...(rawConfig.reporting?.statusEmoji || {})
+      },
+      sections: {
+        ...DEFAULT_REPORTING.sections,
+        ...(rawConfig.reporting?.sections || {})
+      }
+    },
     sites: rawConfig.sites || []
   };
 
   return config;
 }
 
-/**
- * Validates the loaded config based on operational requirements.
- * 
- * @param {object} config 
- * @param {boolean} [dryRun=false] If dry-run, credentials validation is relaxed
- */
 export function validateConfig(config, dryRun = false) {
   if (config.site && (!config.site.name || !config.site.isp)) {
     throw new Error('Config Error: site.name and site.isp must be non-empty strings.');
