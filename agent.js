@@ -11,7 +11,9 @@
  * - Zero GUI Fragility: Direct API / Ingestion Engine
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { loadConfig, validateConfig } from './src/config.js';
 import { formatReport } from './src/formatter.js';
 import { captureScreenToFile, cleanupTempFile, listScreens } from './src/capturer.js';
@@ -24,7 +26,51 @@ import { getAllSitesTelemetry } from './src/orbApi.js';
 import { evaluateAlerts } from './src/alertManager.js';
 import { runMultiSiteDailyReport } from './src/multiSiteReport.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootDir = __dirname;
+const configPath = path.join(rootDir, 'config.json');
+const exampleConfigPath = path.join(rootDir, 'config.json.example');
+const envPath = path.join(rootDir, '.env');
+const daemonPidPath = path.join(rootDir, '.agent.pid');
+const reloadSignalPath = path.join(rootDir, '.watchdog-reload');
+
+let activeOptions = {};
+let liveConfig = null;
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function writeDaemonPid() {
+  try {
+    fs.writeFileSync(daemonPidPath, String(process.pid), 'utf8');
+  } catch (error) {
+    console.warn(`[Watchdog] Could not write daemon pid file: ${error.message}`);
+  }
+}
+
+function clearDaemonPid() {
+  try {
+    if (fs.existsSync(daemonPidPath)) {
+      fs.unlinkSync(daemonPidPath);
+    }
+  } catch (error) {
+    console.warn(`[Watchdog] Could not clear daemon pid file: ${error.message}`);
+  }
+}
+
+function refreshLiveConfig() {
+  const activeConfigPath = activeOptions?.configPath || configPath;
+
+  try {
+    const nextConfig = loadConfig(activeConfigPath);
+    validateConfig(nextConfig, Boolean(activeOptions?.dryRun));
+    liveConfig = nextConfig;
+    return liveConfig;
+  } catch (error) {
+    console.warn(`[Watchdog] Config refresh skipped: ${error.message}`);
+    return liveConfig;
+  }
+}
 
 /**
  * Parses basic command-line arguments.
@@ -176,35 +222,58 @@ async function runSingleSiteCycle(config, options = {}) {
  * 24/7 Watchdog Daemon Loop
  */
 async function runWatchdogDaemon(config, options = {}) {
-  const alertAutomationEnabled = config.alerts?.enabled !== false;
-  const dailyReportAutomationEnabled = config.schedule?.dailyReportEnabled !== false;
-  const checkIntervalMins = config.alerts?.checkIntervalMinutes || 3;
-  const checkIntervalMs = checkIntervalMins * 60 * 1000;
-  const targetHour = config.schedule?.dailyReportHour ?? 8;
-  const targetMinute = config.schedule?.dailyReportMinute ?? 0;
+  activeOptions = options;
+  liveConfig = config;
+
+  const checkIntervalMins = () => (liveConfig?.alerts?.checkIntervalMinutes || config?.alerts?.checkIntervalMinutes || 3);
+  const getAlertAutomationEnabled = () => (liveConfig?.alerts?.enabled ?? config?.alerts?.enabled ?? true) !== false;
+  const getDailyReportAutomationEnabled = () => (liveConfig?.schedule?.dailyReportEnabled ?? config?.schedule?.dailyReportEnabled ?? true) !== false;
+  const getTargetHour = () => Number(liveConfig?.schedule?.dailyReportHour ?? config?.schedule?.dailyReportHour ?? 8);
+  const getTargetMinute = () => Number(liveConfig?.schedule?.dailyReportMinute ?? config?.schedule?.dailyReportMinute ?? 0);
 
   let lastDailyReportDate = null;
   let running = true;
 
+  const initialAlertAutomationEnabled = getAlertAutomationEnabled();
+  const initialDailyReportAutomationEnabled = getDailyReportAutomationEnabled();
+  const initialTargetHour = getTargetHour();
+  const initialTargetMinute = getTargetMinute();
+
   console.log(`\n===========================================================`);
   console.log(`🛡️  24/7 ORB WATCHDOG DAEMON STARTED`);
   console.log(`===========================================================`);
-  console.log(`• Alert Automation: ${alertAutomationEnabled ? 'Enabled' : 'Disabled'}`);
-  console.log(`• Site Watchdog Polling Interval: Every ${checkIntervalMins} minute(s)`);
-  console.log(`• Daily Executive Report Schedule: ${dailyReportAutomationEnabled ? `${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')} daily` : 'Disabled'}`);
-  console.log(`• WhatsApp Alerts: ${config.whatsapp?.enabled ? `Enabled (${config.whatsapp.recipientJid})` : 'Disabled'}`);
+  console.log(`• Alert Automation: ${initialAlertAutomationEnabled ? 'Enabled' : 'Disabled'}`);
+  console.log(`• Site Watchdog Polling Interval: Every ${checkIntervalMins()} minute(s)`);
+  console.log(`• Daily Executive Report Schedule: ${initialDailyReportAutomationEnabled ? `${String(initialTargetHour).padStart(2, '0')}:${String(initialTargetMinute).padStart(2, '0')} daily` : 'Disabled'}`);
+  console.log(`• WhatsApp Alerts: ${liveConfig?.whatsapp?.enabled ? `Enabled (${liveConfig.whatsapp.recipientJid})` : 'Disabled'}`);
   console.log(`===========================================================\n`);
 
   const gracefulShutdown = () => {
     console.log(`\n[Watchdog] Graceful shutdown signal received. Stopping daemon.`);
     running = false;
+    clearDaemonPid();
     process.exit(0);
   };
+
   process.on('SIGINT', gracefulShutdown);
   process.on('SIGTERM', gracefulShutdown);
 
+  fs.watchFile(configPath, { interval: 1000 }, () => {
+    const refreshed = refreshLiveConfig();
+    if (refreshed) {
+      console.log(`[Watchdog] Config file changed; live settings reloaded. Auto alerts: ${refreshed.alerts?.enabled !== false ? 'ON' : 'OFF'} | Daily report: ${refreshed.schedule?.dailyReportEnabled !== false ? 'ON' : 'OFF'}`);
+    }
+  });
+
+  fs.watchFile(reloadSignalPath, { interval: 1000 }, () => {
+    const refreshed = refreshLiveConfig();
+    if (refreshed) {
+      console.log(`[Watchdog] Reload signal detected; live settings reloaded. Auto alerts: ${refreshed.alerts?.enabled !== false ? 'ON' : 'OFF'} | Daily report: ${refreshed.schedule?.dailyReportEnabled !== false ? 'ON' : 'OFF'}`);
+    }
+  });
+
   // Initial immediate assessment
-  if (alertAutomationEnabled) {
+  if (getAlertAutomationEnabled()) {
     try {
       console.log(`[Watchdog] Running startup health evaluation across discovered sites...`);
       const sites = await getAllSitesTelemetry(config);
@@ -218,6 +287,13 @@ async function runWatchdogDaemon(config, options = {}) {
   }
 
   while (running) {
+    const activeConfig = refreshLiveConfig() || config;
+    const alertAutomationEnabled = getAlertAutomationEnabled();
+    const dailyReportAutomationEnabled = getDailyReportAutomationEnabled();
+    const targetHour = getTargetHour();
+    const targetMinute = getTargetMinute();
+    const checkIntervalMs = checkIntervalMins() * 60 * 1000;
+
     await sleep(checkIntervalMs);
     if (!running) break;
 
@@ -228,8 +304,8 @@ async function runWatchdogDaemon(config, options = {}) {
     if (alertAutomationEnabled) {
       try {
         console.log(`[Watchdog ${now.toLocaleTimeString()}] Polling discovered sites for status anomalies...`);
-        const sites = await getAllSitesTelemetry(config);
-        const incidents = await evaluateAlerts(config, sites, options);
+        const sites = await getAllSitesTelemetry(activeConfig);
+        const incidents = await evaluateAlerts(activeConfig, sites, options);
         if (incidents.length > 0) {
           console.log(`[Watchdog] ⚠️ Handled ${incidents.length} incident alert(s).`);
         } else {
@@ -246,7 +322,7 @@ async function runWatchdogDaemon(config, options = {}) {
     if (dailyReportAutomationEnabled && now.getHours() === targetHour && now.getMinutes() >= targetMinute && lastDailyReportDate !== currentDateKey) {
       console.log(`[Watchdog] Triggering scheduled daily site report cycle...`);
       try {
-        await runMultiSiteDailyReport(config, options);
+        await runMultiSiteDailyReport(activeConfig, options);
         lastDailyReportDate = currentDateKey;
         console.log(`[Watchdog] Daily site report cycle completed successfully.`);
       } catch (dailyErr) {
@@ -261,6 +337,11 @@ async function runWatchdogDaemon(config, options = {}) {
  */
 async function main() {
   const options = parseArgs();
+  activeOptions = options;
+
+  if (options.daemon || options.intervalMinutes) {
+    writeDaemonPid();
+  }
 
   // Mode: Interactive WhatsApp Pairing
   if (options.authWa) {
@@ -280,6 +361,7 @@ async function main() {
 
   // Load configuration
   const config = loadConfig(options.configPath);
+  liveConfig = config;
 
   // Mode: List WhatsApp Groups
   if (options.listGroups) {

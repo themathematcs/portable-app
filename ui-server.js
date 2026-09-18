@@ -15,6 +15,8 @@ const uiDir = path.join(rootDir, 'ui');
 const configPath = path.join(rootDir, 'config.json');
 const exampleConfigPath = path.join(rootDir, 'config.json.example');
 const envPath = path.join(rootDir, '.env');
+const daemonPidPath = path.join(rootDir, '.agent.pid');
+const reloadSignalPath = path.join(rootDir, '.watchdog-reload');
 
 // Load .env secrets
 try {
@@ -106,6 +108,15 @@ function writeEnv(updates) {
   for (const [k, v] of Object.entries(updates)) process.env[k] = v;
 }
 
+function reloadRunningDaemon() {
+  try {
+    fs.writeFileSync(reloadSignalPath, String(Date.now()), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ─── saveConfig ───────────────────────────────────────────────────────────────
 async function saveConfig(request, res) {
   try {
@@ -137,7 +148,13 @@ async function saveConfig(request, res) {
     if (merged.orb) delete merged.orb.apiToken;
 
     fs.writeFileSync(configPath, JSON.stringify(merged, null, 2) + '\n', 'utf8');
-    sendJson(res, 200, { ok: true, message: 'Settings saved.' });
+    const daemonReloaded = reloadRunningDaemon();
+    sendJson(res, 200, {
+      ok: true,
+      message: daemonReloaded
+        ? 'Settings saved and forwarded to the running daemon.'
+        : 'Settings saved. Restart the watchdog daemon to apply the toggles.'
+    });
   } catch (error) {
     sendJson(res, 400, { ok: false, message: error.message || 'Invalid settings payload.' });
   }
