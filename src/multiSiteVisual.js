@@ -278,7 +278,6 @@ function buildMultiSiteHtml(sites, dateStr) {
   </div>
 
   <div class="dash-footer">
-    <div>Autonomous Edge Monitoring Engine • 24/7 Watchdog Active</div>
     <div>Report Generated: ${dateStr}</div>
   </div>
 </div>

@@ -16,7 +16,7 @@ const APP_ROOT = path.resolve(__dirname, '..');
 const CLONE_APP_DIR = process.env.ORB_CLONE_DIR
   ? path.resolve(process.env.ORB_CLONE_DIR)
   : path.resolve(APP_ROOT, 'orb interface', 'ob');
-const DEFAULT_CLONE_PORT = 4173;
+const DEFAULT_CLONE_PORT = 4183;
 const CLONE_PORT_RANGE_SIZE = 25;
 const SERVER_START_TIMEOUT_MS = 45_000;
 

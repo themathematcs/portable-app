@@ -64,10 +64,10 @@ const DEFAULT_REPORTING = {
     speed: true,
     location: true,
     uptime: true,
-    footer: true
+    footer: false
   },
   sectionOrder: ['header', 'score', 'isp', 'location', 'uptime', 'speed', 'footer'],
-  footerText: '🤖 Orb Network Monitor | 24/7 Watchdog Active'
+  footerText: ''
 };
 
 export function loadConfig(configPath) {

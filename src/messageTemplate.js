@@ -15,10 +15,10 @@ export const DEFAULT_MESSAGE_TEMPLATE = {
     speed: true,
     location: true,
     uptime: true,
-    footer: true,
+    footer: false,
   },
   sectionOrder: ['header', 'score', 'isp', 'location', 'uptime', 'speed', 'footer'],
-  footerText: '🤖 Orb Network Monitor | 24/7 Watchdog Active',
+  footerText: '',
 };
 
 export function normalizeReportingConfig(rawConfig = {}) {
@@ -57,6 +57,9 @@ export function buildMessageTemplate(config = {}, site = {}) {
       case 'header':
         lines.push(`🌐 *ORB NETWORK OBSERVABILITY - SITE STATUS REPORT*`);
         lines.push(`📅 Date: ${site.date || new Date().toLocaleDateString()}`);
+        if (site.name) {
+          lines.push(`📍 *Site:* ${site.name}`);
+        }
         break;
       case 'score':
         if (reporting.sections?.scoreBreakdown !== false) {
@@ -85,8 +88,11 @@ export function buildMessageTemplate(config = {}, site = {}) {
         break;
       case 'footer':
         if (reporting.sections?.footer !== false) {
-          lines.push('');
-          lines.push(reporting.footerText || DEFAULT_MESSAGE_TEMPLATE.footerText);
+          const footerText = (reporting.footerText || DEFAULT_MESSAGE_TEMPLATE.footerText || '').trim();
+          if (footerText) {
+            lines.push('');
+            lines.push(footerText);
+          }
         }
         break;
       default:
