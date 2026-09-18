@@ -6,15 +6,46 @@ import { createRequire } from 'node:module';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DEFAULT_CONFIG_PATH = path.resolve(__dirname, '../config.json');
-const ENV_PATH = path.resolve(__dirname, '../.env');
+const ENV_CANDIDATES = [
+  path.resolve(__dirname, '../.env'),
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(__dirname, '.env')
+].filter((value, index, arr) => arr.indexOf(value) === index);
 
-try {
-  const require = createRequire(import.meta.url);
-  const dotenv = require('dotenv');
-  dotenv.config({ path: ENV_PATH });
-} catch {
-  // dotenv not installed or .env missing
+function loadDotEnv() {
+  for (const envPath of ENV_CANDIDATES) {
+    if (!fs.existsSync(envPath)) continue;
+
+    try {
+      const require = createRequire(import.meta.url);
+      const dotenv = require('dotenv');
+      const result = dotenv.config({ path: envPath });
+      if (result?.parsed) {
+        for (const [key, value] of Object.entries(result.parsed)) {
+          if (process.env[key] === undefined) process.env[key] = value;
+        }
+      }
+    } catch {
+      // dotenv not installed or config failed; fallback below
+    }
+
+    const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex === -1) continue;
+      const key = trimmed.slice(0, eqIndex).trim();
+      const value = trimmed.slice(eqIndex + 1).trim().replace(/^['"]|['"]$/g, '');
+      if (!key) continue;
+      if (process.env[key] === undefined) process.env[key] = value;
+    }
+
+    return;
+  }
 }
+
+loadDotEnv();
 
 const DEFAULT_REPORTING = {
   statusEmoji: {
