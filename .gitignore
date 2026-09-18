@@ -7,4 +7,5 @@ auth_info/
 *.log
 .env
 .env.*
+!.env.example
 .DS_Store
