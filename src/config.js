@@ -144,6 +144,9 @@ export function loadConfig(configPath) {
       dailyReportHour: Number(rawConfig.schedule?.dailyReportHour) || 8,
       dailyReportMinute: Number(rawConfig.schedule?.dailyReportMinute) || 0
     },
+    excludedSites: Array.isArray(rawConfig.excludedSites)
+      ? rawConfig.excludedSites.map((site) => String(site).trim()).filter(Boolean)
+      : [],
     reporting: {
       ...DEFAULT_REPORTING,
       ...(rawConfig.reporting || {}),

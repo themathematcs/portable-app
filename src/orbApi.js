@@ -13,6 +13,29 @@ import { getOrbCloudTelemetry } from './orbCloud.js';
  * @param {object} config System configuration
  * @returns {Promise<Array<object>>} List of real, non-synthetic site objects
  */
+function normalizeSiteKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function filterExcludedSites(sites, config = {}) {
+  const excluded = new Set((config.excludedSites || []).map((site) => normalizeSiteKey(site)));
+  if (excluded.size === 0) return sites;
+
+  const filtered = (sites || []).filter((site) => {
+    const candidates = [site?.name, site?.id, site?.siteName, site?.displayName];
+    return !candidates.some((candidate) => excluded.has(normalizeSiteKey(candidate)));
+  });
+
+  if (filtered.length !== (sites || []).length) {
+    console.log(`[Orb API] Excluding ${((sites || []).length - filtered.length)} removed site(s) based on config.excludedSites.`);
+  }
+
+  return filtered;
+}
+
 export async function getAllSitesTelemetry(config) {
   console.log('Full loaded config object:', JSON.stringify(config, null, 2));
   console.log('process.env.ORB_API_TOKEN exists:', !!process.env.ORB_API_TOKEN);
@@ -31,8 +54,9 @@ export async function getAllSitesTelemetry(config) {
       const cloudSites = await getOrbCloudTelemetry(config);
       console.log(`[Orb API Debug] Cloud result type=${Array.isArray(cloudSites) ? 'array' : typeof cloudSites} | length=${Array.isArray(cloudSites) ? cloudSites.length : 'n/a'}`);
       if (Array.isArray(cloudSites) && cloudSites.length > 0) {
-        console.log(`[Orb API] Using Orb Cloud telemetry for ${cloudSites.length} site(s).`);
-        return cloudSites;
+        const filteredCloudSites = filterExcludedSites(cloudSites, config);
+        console.log(`[Orb API] Using Orb Cloud telemetry for ${filteredCloudSites.length} site(s).`);
+        return filteredCloudSites;
       }
       console.log('[Orb API Debug] Cloud call returned no usable sites. Falling back to local Orb telemetry.');
     } catch (cloudError) {
@@ -49,7 +73,9 @@ export async function getAllSitesTelemetry(config) {
       throw new Error(`Orb is not running, so a live report cannot be created. ${orbStatus.error || 'Install Orb or start it on this computer.'}`);
     }
     const localSites = await getLocalOrbTelemetry(config);
-    if (Array.isArray(localSites) && localSites.length > 0) return localSites;
+    if (Array.isArray(localSites) && localSites.length > 0) {
+      return filterExcludedSites(localSites, config);
+    }
   } catch (localError) {
     console.warn(`[Orb Local Debug] Local Orb fallback error: ${localError.message}`);
   }
